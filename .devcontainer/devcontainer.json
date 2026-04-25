@@ -7,7 +7,7 @@
       "jdkDistro": "ms"
     }
   },
-  "onCreateCommand": "sh .devcontainer/setup.sh",
+  "onCreateCommand": ["/bin/sh", ".devcontainer/setup.sh"],
   "customizations": {
     "vscode": {
       "extensions": [
