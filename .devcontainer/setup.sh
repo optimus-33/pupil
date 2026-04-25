@@ -6,8 +6,9 @@ echo "Installing Android SDK..."
 ANDROID_SDK_ROOT="/usr/local/android-sdk"
 CMDLINE_TOOLS_VERSION="11076708"
 
-apt-get update -qq
-apt-get install -y -qq wget unzip
+# Use full path for apt-get; tools may already be present
+/usr/bin/apt-get update -qq
+/usr/bin/apt-get install -y -qq wget unzip
 
 mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
 cd /tmp
@@ -24,7 +25,5 @@ $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
   "build-tools;34.0.0"
 
 chown -R vscode:vscode $ANDROID_SDK_ROOT
-
 echo "sdk.dir=/usr/local/android-sdk" > /workspaces/pupil/local.properties
-
 echo "Android SDK setup complete."
