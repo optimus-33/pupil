@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.core.view.WindowCompat
+import com.pupil.app.core.ui.theme.PupilTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

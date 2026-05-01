@@ -1,6 +1,7 @@
 package com.pupil.app.core.data.repository
 
 import com.pupil.app.core.data.local.dao.PaymentAppConfigDao
+import com.pupil.app.core.data.local.entity.PaymentAppConfigEntity
 import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.PaymentType
 import com.pupil.app.core.domain.repository.PaymentAppConfigRepository
@@ -17,11 +18,26 @@ class PaymentAppConfigRepositoryImpl(
         dao.getByType(paymentType.typeName).map { entities -> entities.map { it.toDomain() } }
 
     override suspend fun setAppEnabled(id: Long, enabled: Boolean) {
-        dao.getAll().map { it }.let { }
-        val current = dao.getAll() // placeholder to satisfy API
+        dao.updateEnabled(id, enabled)
     }
 
     override suspend fun addPaymentAppConfig(config: PaymentAppConfig) {
         dao.insert(config.toEntity())
     }
 }
+
+private fun PaymentAppConfigEntity.toDomain() = PaymentAppConfig(
+    id = id,
+    displayName = displayName,
+    packageName = packageName,
+    paymentType = PaymentType.fromTypeName(paymentType),
+    enabled = enabled
+)
+
+private fun PaymentAppConfig.toEntity() = PaymentAppConfigEntity(
+    id = id,
+    displayName = displayName,
+    packageName = packageName,
+    paymentType = paymentType.typeName,
+    enabled = enabled
+)

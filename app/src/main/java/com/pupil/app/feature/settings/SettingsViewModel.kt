@@ -8,23 +8,18 @@ import com.pupil.app.core.domain.usecase.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    transactionUseCases: TransactionUseCases
+    private val transactionUseCases: TransactionUseCases
 ) : ViewModel() {
-    val paymentApps: StateFlow<List<PaymentAppConfig>> = transactionUseCases.getAllPaymentApps()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    val uiState: StateFlow<SettingsUiState> = paymentApps.combine(
-        transactionUseCases.getAllPaymentApps()
-    ) { allApps, _ ->
-        SettingsUiState(apps = allApps)
-    }.stateIn(viewModelScope, SharingStarted.Lazily, SettingsUiState())
+    val uiState: StateFlow<SettingsUiState> = transactionUseCases.getAllPaymentApps()
+        .map { apps -> SettingsUiState(apps = apps) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, SettingsUiState())
 
     fun setAppEnabled(id: Long, enabled: Boolean) {
         viewModelScope.launch {

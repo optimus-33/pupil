@@ -16,6 +16,9 @@ interface PaymentAppConfigDao {
     @Query("SELECT * FROM payment_app_configs WHERE paymentType = :paymentType AND enabled = 1 ORDER BY displayName")
     fun getByType(paymentType: String): Flow<List<PaymentAppConfigEntity>>
 
+    @Query("UPDATE payment_app_configs SET enabled = :enabled WHERE id = :id")
+    suspend fun updateEnabled(id: Long, enabled: Boolean)
+
     @Update
     suspend fun update(config: PaymentAppConfigEntity)
 

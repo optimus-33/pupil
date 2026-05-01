@@ -2,7 +2,8 @@ package com.pupil.app
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -30,13 +31,13 @@ object Screen {
 @Composable
 fun PupilNavGraph() {
     val navController = rememberNavController()
-    val context = LocalContext.current
 
     NavHost(navController = navController, startDestination = Screen.Home) {
         composable(Screen.Home) {
             val viewModel: HomeViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsState()
             HomeScreen(
-                uiState = viewModel.uiState,
+                uiState = uiState,
                 onScanPay = { navController.navigate(Screen.QRScan) },
                 onManualEntry = { navController.navigate("${Screen.PaymentEntry}?upiId=&merchantName=") },
                 onOpenReports = { navController.navigate(Screen.Reports) },
@@ -69,15 +70,17 @@ fun PupilNavGraph() {
         }
         composable(Screen.Reports) {
             val viewModel: ReportsViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsState()
             ReportsScreen(
-                uiState = viewModel.uiState,
+                uiState = uiState,
                 onBack = { navController.popBackStack() }
             )
         }
         composable(Screen.Settings) {
             val viewModel: SettingsViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsState()
             SettingsScreen(
-                uiState = viewModel.uiState,
+                uiState = uiState,
                 onToggleAppEnabled = viewModel::setAppEnabled,
                 onAddCustomApp = viewModel::addCustomApp,
                 onBack = { navController.popBackStack() }

@@ -7,10 +7,9 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Teal = Color(0xFF1D9E75)
+val Teal = Color(0xFF1D9E75)
 private val DarkGray = Color(0xFF121212)
 private val LightGray = Color(0xFFF5F5F5)
-private val SurfaceGray = Color(0xFFFAFAFA)
 
 private val LightColors = lightColorScheme(
     primary = Teal,
@@ -39,7 +38,6 @@ fun PupilTheme(
     MaterialTheme(
         colorScheme = colors,
         typography = Typography,
-        shapes = Shapes,
         content = content
     )
 }
