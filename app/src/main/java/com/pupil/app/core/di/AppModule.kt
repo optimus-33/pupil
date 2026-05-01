@@ -10,14 +10,17 @@ import com.pupil.app.core.data.repository.TransactionRepositoryImpl
 import com.pupil.app.core.domain.repository.PaymentAppConfigRepository
 import com.pupil.app.core.domain.repository.TransactionRepository
 import com.pupil.app.core.domain.usecase.AddPaymentAppConfigUseCase
+import com.pupil.app.core.domain.usecase.DeleteTransactionUseCase
 import com.pupil.app.core.domain.usecase.GetAllPaymentAppsUseCase
 import com.pupil.app.core.domain.usecase.GetAllTransactionsUseCase
 import com.pupil.app.core.domain.usecase.GetCategoryTotalsInRangeUseCase
 import com.pupil.app.core.domain.usecase.GetPaymentAppsByTypeUseCase
+import com.pupil.app.core.domain.usecase.GetPendingTransactionsUseCase
 import com.pupil.app.core.domain.usecase.GetTotalInRangeUseCase
 import com.pupil.app.core.domain.usecase.SaveTransactionUseCase
 import com.pupil.app.core.domain.usecase.SetPaymentAppEnabledUseCase
 import com.pupil.app.core.domain.usecase.TransactionUseCases
+import com.pupil.app.core.domain.usecase.UpdateTransactionStatusUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -58,9 +61,13 @@ object AppModule {
         getMonthlyTotal = GetTotalInRangeUseCase(transactionRepository),
         getCategoryTotalsInRange = GetCategoryTotalsInRangeUseCase(transactionRepository),
         saveTransaction = SaveTransactionUseCase(transactionRepository),
+        deleteTransaction = DeleteTransactionUseCase(transactionRepository),
+        updateTransactionStatus = UpdateTransactionStatusUseCase(transactionRepository),
+        getPendingTransactions = GetPendingTransactionsUseCase(transactionRepository),
         getPaymentAppsByType = GetPaymentAppsByTypeUseCase(paymentAppConfigRepository),
         getAllPaymentApps = GetAllPaymentAppsUseCase(paymentAppConfigRepository),
         setPaymentAppEnabled = SetPaymentAppEnabledUseCase(paymentAppConfigRepository),
         addPaymentAppConfig = AddPaymentAppConfigUseCase(paymentAppConfigRepository)
     )
 }
+

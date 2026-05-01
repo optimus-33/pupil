@@ -14,5 +14,7 @@ data class TransactionEntity(
     val paymentType: String,
     val paymentApp: String,
     val timestamp: Long,
-    val isManual: Boolean
+    val isManual: Boolean,
+    val status: String = "COMPLETED"
 )
+

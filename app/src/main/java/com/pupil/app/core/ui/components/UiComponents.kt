@@ -7,10 +7,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,27 +23,71 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.Transaction
+import com.pupil.app.core.domain.model.TransactionStatus
 import com.pupil.app.core.ui.theme.Teal
 import com.pupil.app.core.ui.util.Formatters
 
 @Composable
-fun TransactionCard(transaction: Transaction) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+fun TransactionCard(
+    transaction: Transaction,
+    onDelete: ((Long) -> Unit)? = null,
+    onMarkCompleted: ((Long) -> Unit)? = null,
+    onMarkFailed: ((Long) -> Unit)? = null
+) {
+    val isPending = transaction.status == TransactionStatus.PENDING
+    val isFailed = transaction.status == TransactionStatus.FAILED
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        tonalElevation = if (isPending) 4.dp else 0.dp
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(text = transaction.merchantName, style = MaterialTheme.typography.titleMedium)
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = transaction.merchantName, style = MaterialTheme.typography.titleMedium)
+                        if (isPending) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            StatusBadge(label = "Pending", color = Color(0xFFFF9800))
+                        }
+                        if (isFailed) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            StatusBadge(label = "Failed", color = Color(0xFFE53935))
+                        }
+                    }
                     Text(text = transaction.reason, style = MaterialTheme.typography.bodyMedium)
                 }
-                Text(text = "₹${Formatters.formatPaise(transaction.amountPaise)}", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "₹${Formatters.formatPaise(transaction.amountPaise)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 CategoryBadge(label = transaction.category)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = transaction.paymentApp, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Spacer(modifier = Modifier.weight(1f))
+                if (isPending && onMarkCompleted != null && onMarkFailed != null) {
+                    IconButton(onClick = { onMarkCompleted(transaction.id) }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Mark completed", tint = Teal, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = { onMarkFailed(transaction.id) }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Mark failed", tint = Color(0xFFE53935), modifier = Modifier.size(18.dp))
+                    }
+                }
+                if (isFailed && onDelete != null) {
+                    IconButton(onClick = { onDelete(transaction.id) }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Delete", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                    }
+                }
             }
         }
     }
@@ -56,6 +105,22 @@ fun CategoryBadge(label: String) {
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             style = MaterialTheme.typography.bodySmall,
             color = Teal
+        )
+    }
+}
+
+@Composable
+fun StatusBadge(label: String, color: Color) {
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = color.copy(alpha = 0.12f)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

@@ -10,5 +10,18 @@ data class Transaction(
     val paymentType: PaymentType,
     val paymentApp: String,
     val timestamp: Long,
-    val isManual: Boolean = false
+    val isManual: Boolean = false,
+    val status: TransactionStatus = TransactionStatus.COMPLETED
 )
+
+enum class TransactionStatus(val statusName: String) {
+    PENDING("PENDING"),
+    COMPLETED("COMPLETED"),
+    FAILED("FAILED");
+
+    companion object {
+        fun fromStatusName(value: String?): TransactionStatus =
+            values().firstOrNull { it.statusName == value } ?: COMPLETED
+    }
+}
+

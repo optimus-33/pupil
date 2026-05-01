@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [TransactionEntity::class, PaymentAppConfigEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class PupilDatabase : RoomDatabase() {
@@ -50,3 +50,4 @@ abstract class PupilDatabase : RoomDatabase() {
         }
     }
 }
+

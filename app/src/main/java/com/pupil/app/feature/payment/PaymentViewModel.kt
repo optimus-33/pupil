@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.PaymentType
 import com.pupil.app.core.domain.model.Transaction
+import com.pupil.app.core.domain.model.TransactionStatus
 import com.pupil.app.core.domain.usecase.TransactionUseCases
-import com.pupil.app.core.ui.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,6 +31,12 @@ class PaymentViewModel @Inject constructor(
     val selectedPaymentType: StateFlow<PaymentType> = paymentTypeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, PaymentType.UPI)
     val selectedApp: StateFlow<PaymentAppConfig?> = selectedAppFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    private val _pendingTransactionId = MutableStateFlow<Long?>(null)
+    val pendingTransactionId: StateFlow<Long?> = _pendingTransactionId.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val _errorMessage = MutableStateFlow("")
+    val errorMessage: StateFlow<String> = _errorMessage.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     fun selectPaymentType(paymentType: PaymentType) {
         paymentTypeFlow.value = paymentType
         selectedAppFlow.value = null
@@ -40,7 +46,11 @@ class PaymentViewModel @Inject constructor(
         selectedAppFlow.value = app
     }
 
-    fun saveTransaction(
+    /**
+     * Creates a pending transaction and returns its ID.
+     * The UPI app launch should happen after this.
+     */
+    fun createPendingTransaction(
         merchantName: String,
         upiId: String?,
         amountPaise: Long,
@@ -51,9 +61,9 @@ class PaymentViewModel @Inject constructor(
         isManual: Boolean
     ) {
         viewModelScope.launch {
-            transactionUseCases.saveTransaction(
+            val id = transactionUseCases.saveTransaction(
                 Transaction(
-                    merchantName = merchantName.ifBlank { "Unknown merchant" },
+                    merchantName = merchantName.ifBlank { upiId ?: "Unknown merchant" },
                     upiId = upiId,
                     amountPaise = amountPaise,
                     reason = reason,
@@ -61,9 +71,49 @@ class PaymentViewModel @Inject constructor(
                     paymentType = paymentType,
                     paymentApp = paymentAppName,
                     timestamp = System.currentTimeMillis(),
-                    isManual = isManual
+                    isManual = isManual,
+                    status = TransactionStatus.PENDING
                 )
             )
+            _pendingTransactionId.value = id
         }
     }
+
+    /**
+     * Mark the pending transaction as completed (payment succeeded)
+     */
+    fun confirmPaymentSuccess() {
+        val id = _pendingTransactionId.value ?: return
+        viewModelScope.launch {
+            transactionUseCases.updateTransactionStatus(id, TransactionStatus.COMPLETED.statusName)
+            _pendingTransactionId.value = null
+        }
+    }
+
+    /**
+     * Mark the pending transaction as failed (payment failed)
+     */
+    fun confirmPaymentFailed() {
+        val id = _pendingTransactionId.value ?: return
+        viewModelScope.launch {
+            transactionUseCases.updateTransactionStatus(id, TransactionStatus.FAILED.statusName)
+            _pendingTransactionId.value = null
+        }
+    }
+
+    /**
+     * Delete the pending transaction entirely (user chose to discard)
+     */
+    fun discardPendingTransaction() {
+        val id = _pendingTransactionId.value ?: return
+        viewModelScope.launch {
+            transactionUseCases.deleteTransaction(id)
+            _pendingTransactionId.value = null
+        }
+    }
+
+    fun clearError() {
+        _errorMessage.value = ""
+    }
 }
+

@@ -41,7 +41,10 @@ fun PupilNavGraph() {
                 onScanPay = { navController.navigate(Screen.QRScan) },
                 onManualEntry = { navController.navigate("${Screen.PaymentEntry}?upiId=&merchantName=") },
                 onOpenReports = { navController.navigate(Screen.Reports) },
-                onOpenSettings = { navController.navigate(Screen.Settings) }
+                onOpenSettings = { navController.navigate(Screen.Settings) },
+                onDeleteTransaction = viewModel::deleteTransaction,
+                onMarkCompleted = viewModel::markTransactionAsCompleted,
+                onMarkFailed = viewModel::markTransactionAsFailed
             )
         }
         composable(Screen.QRScan) {
@@ -65,7 +68,10 @@ fun PupilNavGraph() {
                 upiId = upiId,
                 merchantName = backStackEntry.arguments?.getString("merchantName")?.takeIf { it.isNotBlank() },
                 viewModel = paymentViewModel,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onPaymentComplete = {
+                    navController.popBackStack(Screen.Home, inclusive = false)
+                }
             )
         }
         composable(Screen.Reports) {
@@ -88,3 +94,4 @@ fun PupilNavGraph() {
         }
     }
 }
+

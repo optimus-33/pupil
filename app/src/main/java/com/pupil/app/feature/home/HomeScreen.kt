@@ -38,7 +38,10 @@ fun HomeScreen(
     onScanPay: () -> Unit,
     onManualEntry: () -> Unit,
     onOpenReports: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onDeleteTransaction: ((Long) -> Unit)? = null,
+    onMarkCompleted: ((Long) -> Unit)? = null,
+    onMarkFailed: ((Long) -> Unit)? = null
 ) {
     Scaffold(
         topBar = {
@@ -92,7 +95,12 @@ fun HomeScreen(
                                 Text(text = dateLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             }
                             items(items) { transaction ->
-                                TransactionCard(transaction)
+                                TransactionCard(
+                                    transaction = transaction,
+                                    onDelete = onDeleteTransaction,
+                                    onMarkCompleted = onMarkCompleted,
+                                    onMarkFailed = onMarkFailed
+                                )
                             }
                         }
                     }
@@ -101,3 +109,4 @@ fun HomeScreen(
         }
     }
 }
+

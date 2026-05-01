@@ -13,6 +13,9 @@ data class TransactionUseCases(
     val getMonthlyTotal: GetTotalInRangeUseCase,
     val getCategoryTotalsInRange: GetCategoryTotalsInRangeUseCase,
     val saveTransaction: SaveTransactionUseCase,
+    val deleteTransaction: DeleteTransactionUseCase,
+    val updateTransactionStatus: UpdateTransactionStatusUseCase,
+    val getPendingTransactions: GetPendingTransactionsUseCase,
     val getPaymentAppsByType: GetPaymentAppsByTypeUseCase,
     val getAllPaymentApps: GetAllPaymentAppsUseCase,
     val setPaymentAppEnabled: SetPaymentAppEnabledUseCase,
@@ -32,7 +35,19 @@ class GetCategoryTotalsInRangeUseCase(private val repository: com.pupil.app.core
 }
 
 class SaveTransactionUseCase(private val repository: com.pupil.app.core.domain.repository.TransactionRepository) {
-    suspend operator fun invoke(transaction: Transaction) = repository.insertTransaction(transaction)
+    suspend operator fun invoke(transaction: Transaction): Long = repository.insertTransaction(transaction)
+}
+
+class DeleteTransactionUseCase(private val repository: com.pupil.app.core.domain.repository.TransactionRepository) {
+    suspend operator fun invoke(id: Long) = repository.deleteTransaction(id)
+}
+
+class UpdateTransactionStatusUseCase(private val repository: com.pupil.app.core.domain.repository.TransactionRepository) {
+    suspend operator fun invoke(id: Long, status: String) = repository.updateTransactionStatus(id, status)
+}
+
+class GetPendingTransactionsUseCase(private val repository: com.pupil.app.core.domain.repository.TransactionRepository) {
+    operator fun invoke(): Flow<List<Transaction>> = repository.getPendingTransactions()
 }
 
 class GetPaymentAppsByTypeUseCase(private val repository: com.pupil.app.core.domain.repository.PaymentAppConfigRepository) {
@@ -50,3 +65,4 @@ class SetPaymentAppEnabledUseCase(private val repository: com.pupil.app.core.dom
 class AddPaymentAppConfigUseCase(private val repository: com.pupil.app.core.domain.repository.PaymentAppConfigRepository) {
     suspend operator fun invoke(config: PaymentAppConfig) = repository.addPaymentAppConfig(config)
 }
+
