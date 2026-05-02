@@ -11,7 +11,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -42,13 +41,13 @@ class PaymentViewModel @Inject constructor(
         selectedAppFlow.value = null
     }
 
-    fun selectPaymentApp(app: PaymentAppConfig) {
+    fun selectPaymentApp(app: PaymentAppConfig?) {
         selectedAppFlow.value = app
     }
 
     /**
      * Creates a pending transaction and returns its ID.
-     * The UPI app launch should happen after this.
+     * Supports custom timestamp for manual entries.
      */
     fun createPendingTransaction(
         merchantName: String,
@@ -58,7 +57,8 @@ class PaymentViewModel @Inject constructor(
         category: String,
         paymentType: PaymentType,
         paymentAppName: String,
-        isManual: Boolean
+        isManual: Boolean,
+        customTimestamp: Long? = null
     ) {
         viewModelScope.launch {
             val id = transactionUseCases.saveTransaction(
@@ -70,7 +70,7 @@ class PaymentViewModel @Inject constructor(
                     category = category,
                     paymentType = paymentType,
                     paymentApp = paymentAppName,
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = customTimestamp ?: System.currentTimeMillis(),
                     isManual = isManual,
                     status = TransactionStatus.PENDING
                 )
@@ -116,4 +116,3 @@ class PaymentViewModel @Inject constructor(
         _errorMessage.value = ""
     }
 }
-

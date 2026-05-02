@@ -30,6 +30,7 @@ import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.Transaction
 import com.pupil.app.core.domain.model.TransactionStatus
 import com.pupil.app.core.ui.theme.Teal
+import com.pupil.app.core.ui.util.DateUtils
 import com.pupil.app.core.ui.util.Formatters
 
 @Composable
@@ -63,11 +64,19 @@ fun TransactionCard(
                     Text(text = transaction.reason, style = MaterialTheme.typography.bodyMedium)
                 }
                 Text(
-                    text = "₹${Formatters.formatPaise(transaction.amountPaise)}",
+                    text = "\u20B9${Formatters.formatPaise(transaction.amountPaise)}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
             }
+
+            // Timestamp display
+            Text(
+                text = DateUtils.formatTimestamp(transaction.timestamp),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically

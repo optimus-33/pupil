@@ -2,6 +2,9 @@ package com.pupil.app.feature.payment
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,20 +16,25 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,19 +67,45 @@ fun QRScanScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var detectedVpa by rememberSaveable { mutableStateOf("") }
-    var hasPermission by remember {
+    var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         )
     }
+    var galleryError by rememberSaveable { mutableStateOf("") }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted -> hasPermission = isGranted }
+    ) { isGranted -> hasCameraPermission = isGranted }
+
+    // Gallery picker for QR images
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+                if (bitmap != null) {
+                    scanBitmapForQr(bitmap) { result ->
+                        if (result.isNotBlank()) {
+                            detectedVpa = result
+                        } else {
+                            galleryError = "No UPI QR code found in the selected image."
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("QRScanScreen", "Failed to read image", e)
+                galleryError = "Failed to read the selected image."
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
-        if (!hasPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
+        if (!hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -88,7 +122,7 @@ fun QRScanScreen(
         }
     ) { innerPadding ->
         Surface(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (!hasPermission) {
+            if (!hasCameraPermission) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(text = "Camera permission required to scan QR codes.", color = Color.Gray)
                 }
@@ -139,17 +173,47 @@ fun QRScanScreen(
                     ) {
                         Column {
                             Text(
-                                text = if (detectedVpa.isBlank()) "Point your camera at a UPI QR code." else "Detected: $detectedVpa",
+                                text = when {
+                                    detectedVpa.isNotBlank() -> "Detected: $detectedVpa"
+                                    galleryError.isNotBlank() -> galleryError
+                                    else -> "Point your camera at a UPI QR code."
+                                },
                                 color = Color.White,
                                 style = MaterialTheme.typography.bodyLarge
                             )
+
+                            if (galleryError.isNotBlank()) {
+                                galleryError = ""
+                            }
+
                             Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = { onContinue(detectedVpa) },
-                                enabled = detectedVpa.isNotBlank(),
-                                modifier = Modifier.fillMaxWidth()
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text(text = "Continue")
+                                OutlinedButton(
+                                    onClick = {
+                                        galleryLauncher.launch("image/*")
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoLibrary,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.size(4.dp))
+                                    Text(text = "Browse Gallery")
+                                }
+
+                                Button(
+                                    onClick = { onContinue(detectedVpa) },
+                                    enabled = detectedVpa.isNotBlank(),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(text = "Continue")
+                                }
                             }
                         }
                     }
@@ -176,4 +240,17 @@ private fun scanImageProxy(imageProxy: ImageProxy, scanner: com.google.mlkit.vis
     } else {
         imageProxy.close()
     }
+}
+
+private fun scanBitmapForQr(bitmap: Bitmap, onDetected: (String) -> Unit) {
+    val scanner = BarcodeScanning.getClient()
+    val image = InputImage.fromBitmap(bitmap, 0)
+    scanner.process(image)
+        .addOnSuccessListener { barcodes ->
+            val candidate = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
+            onDetected(candidate.orEmpty())
+        }
+        .addOnFailureListener {
+            onDetected("")
+        }
 }

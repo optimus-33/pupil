@@ -12,9 +12,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.pupil.app.feature.home.HomeScreen
 import com.pupil.app.feature.home.HomeViewModel
+import com.pupil.app.feature.payment.ContactsPickerScreen
 import com.pupil.app.feature.payment.PaymentEntryScreen
 import com.pupil.app.feature.payment.PaymentViewModel
 import com.pupil.app.feature.payment.QRScanScreen
+import com.pupil.app.feature.payment.UpiEntryScreen
 import com.pupil.app.feature.reports.ReportsScreen
 import com.pupil.app.feature.reports.ReportsViewModel
 import com.pupil.app.feature.settings.SettingsScreen
@@ -23,6 +25,8 @@ import com.pupil.app.feature.settings.SettingsViewModel
 object Screen {
     const val Home = "home"
     const val QRScan = "qr_scan"
+    const val UpiEntry = "upi_entry"
+    const val ContactsPicker = "contacts_picker"
     const val PaymentEntry = "payment_entry"
     const val Reports = "reports"
     const val Settings = "settings"
@@ -44,7 +48,9 @@ fun PupilNavGraph() {
                 onOpenSettings = { navController.navigate(Screen.Settings) },
                 onDeleteTransaction = viewModel::deleteTransaction,
                 onMarkCompleted = viewModel::markTransactionAsCompleted,
-                onMarkFailed = viewModel::markTransactionAsFailed
+                onMarkFailed = viewModel::markTransactionAsFailed,
+                onEnterUpiId = { navController.navigate(Screen.UpiEntry) },
+                onPickContact = { navController.navigate(Screen.ContactsPicker) }
             )
         }
         composable(Screen.QRScan) {
@@ -52,6 +58,22 @@ fun PupilNavGraph() {
                 onBack = { navController.popBackStack() },
                 onContinue = { upiId ->
                     navController.navigate("${Screen.PaymentEntry}?upiId=${Uri.encode(upiId)}&merchantName=")
+                }
+            )
+        }
+        composable(Screen.UpiEntry) {
+            UpiEntryScreen(
+                onBack = { navController.popBackStack() },
+                onContinue = { upiId ->
+                    navController.navigate("${Screen.PaymentEntry}?upiId=${Uri.encode(upiId)}&merchantName=")
+                }
+            )
+        }
+        composable(Screen.ContactsPicker) {
+            ContactsPickerScreen(
+                onBack = { navController.popBackStack() },
+                onContactSelected = { phoneNumber ->
+                    navController.navigate("${Screen.PaymentEntry}?upiId=${Uri.encode(phoneNumber)}&merchantName=${Uri.encode(phoneNumber)}")
                 }
             )
         }
@@ -94,4 +116,3 @@ fun PupilNavGraph() {
         }
     }
 }
-

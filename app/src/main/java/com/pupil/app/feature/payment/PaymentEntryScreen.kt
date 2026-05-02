@@ -10,14 +10,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,7 +34,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,10 +49,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.PaymentType
 import com.pupil.app.core.ui.components.PaymentAppCard
 import com.pupil.app.core.ui.components.TypeChip
+import com.pupil.app.core.ui.util.InstalledUpiApp
+import com.pupil.app.core.ui.util.InstalledUpiAppsResolver
 import com.pupil.app.core.ui.util.toPaise
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,8 +72,8 @@ fun PaymentEntryScreen(
 ) {
     val context = LocalContext.current
     val paymentType by viewModel.selectedPaymentType.collectAsState()
-    val paymentApps by viewModel.paymentApps.collectAsState()
-    val selectedApp by viewModel.selectedApp.collectAsState()
+    val dbPaymentApps by viewModel.paymentApps.collectAsState()
+    val selectedDbApp by viewModel.selectedApp.collectAsState()
     val pendingTransactionId by viewModel.pendingTransactionId.collectAsState()
     val viewModelError by viewModel.errorMessage.collectAsState()
     var amountInput by rememberSaveable { mutableStateOf("") }
@@ -66,14 +82,116 @@ fun PaymentEntryScreen(
     var showResultDialog by rememberSaveable { mutableStateOf(false) }
     var localError by rememberSaveable { mutableStateOf("") }
 
-    // Show result dialog when pending transaction exists (user returned from UPI app)
+    // Date/time state
+    var customTimestamp by rememberSaveable { mutableStateOf(System.currentTimeMillis()) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    val isManualEntry = upiId.isNullOrBlank()
+
+    // Installed UPI apps from device
+    var installedUpiApps by rememberSaveable { mutableStateOf<List<InstalledUpiApp>>(emptyList()) }
+    // Selected installed app info (stored as simple strings to avoid type issues)
+    var selectedInstalledAppName by rememberSaveable { mutableStateOf("") }
+    var selectedInstalledAppPackage by rememberSaveable { mutableStateOf("") }
+
+    // Discover installed UPI apps
+    LaunchedEffect(Unit) {
+        installedUpiApps = InstalledUpiAppsResolver.getInstalledUpiApps(context.packageManager)
+    }
+
+    // Combined apps: When UPI type is selected, show installed apps + DB apps as supplement
+    // For UPI_CREDIT_CARD, show DB apps only
+    data class AppDisplayItem(val displayName: String, val packageName: String, val isFromDb: Boolean)
+
+    val allUpiApps = if (paymentType == PaymentType.UPI) {
+        val installedPackages = installedUpiApps.map { it.packageName }.toSet()
+        val dbOnlyApps = dbPaymentApps.filter { it.packageName !in installedPackages }
+        installedUpiApps.map { AppDisplayItem(it.displayName, it.packageName, isFromDb = false) } +
+        dbOnlyApps.map { AppDisplayItem(it.displayName, it.packageName, isFromDb = true) }
+    } else {
+        dbPaymentApps.map { AppDisplayItem(it.displayName, it.packageName, isFromDb = true) }
+    }
+
+    // Date formatting
+    val dateFormat = rememberSaveable { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
+    val timeFormat = rememberSaveable { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
+
+    // Show result dialog when pending transaction exists
     LaunchedEffect(pendingTransactionId) {
         if (pendingTransactionId != null && !showResultDialog) {
             showResultDialog = true
         }
     }
 
-    // Payment result dialog - shown after user returns from UPI payment app
+    // Date picker dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = customTimestamp)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { selectedMillis ->
+                        val cal = Calendar.getInstance().apply {
+                            timeInMillis = customTimestamp
+                            val hour = get(Calendar.HOUR_OF_DAY)
+                            val minute = get(Calendar.MINUTE)
+                            timeInMillis = selectedMillis
+                            set(Calendar.HOUR_OF_DAY, hour)
+                            set(Calendar.MINUTE, minute)
+                        }
+                        customTimestamp = cal.timeInMillis
+                    }
+                    showDatePicker = false
+                }) {
+                    Text(text = "Set Date")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(text = "Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // Time picker dialog
+    if (showTimePicker) {
+        val cal = Calendar.getInstance().apply { timeInMillis = customTimestamp }
+        val timePickerState = rememberTimePickerState(
+            initialHour = cal.get(Calendar.HOUR_OF_DAY),
+            initialMinute = cal.get(Calendar.MINUTE),
+            is24Hour = false
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text(text = "Select Time") },
+            text = { TimePicker(state = timePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cal = Calendar.getInstance().apply {
+                        timeInMillis = customTimestamp
+                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(Calendar.MINUTE, timePickerState.minute)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    customTimestamp = cal.timeInMillis
+                    showTimePicker = false
+                }) {
+                    Text(text = "Set Time")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text(text = "Cancel")
+                }
+            }
+        )
+    }
+
+    // Payment result dialog
     if (showResultDialog && pendingTransactionId != null) {
         AlertDialog(
             onDismissRequest = { },
@@ -133,7 +251,7 @@ fun PaymentEntryScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 'Why' reason field - visually prominent as per UX principles
+                // 'Why' reason field - visually prominent
                 Text(
                     text = "Why are you spending this?",
                     style = MaterialTheme.typography.titleLarge,
@@ -142,7 +260,7 @@ fun PaymentEntryScreen(
                 OutlinedTextField(
                     value = reasonInput,
                     onValueChange = { reasonInput = it },
-                    placeholder = { Text(text = "Groceries, coffee, gift, rent…") },
+                    placeholder = { Text(text = "Groceries, coffee, gift, rent\u2026") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp),
@@ -153,17 +271,51 @@ fun PaymentEntryScreen(
                 OutlinedTextField(
                     value = amountInput,
                     onValueChange = { amountInput = it.take(12) },
-                    label = { Text(text = "Amount (₹)") },
+                    label = { Text(text = "Amount (\u20B9)") },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = merchantName ?: upiId.orEmpty(),
                     onValueChange = { },
-                    label = { Text(text = "Merchant / UPI ID") },
+                    label = { Text(text = "Merchant / UPI ID / Mobile") },
                     modifier = Modifier.fillMaxWidth(),
                     readOnly = true
                 )
+
+                // Date/Time picker - shown for manual entries with custom date/time
+                if (isManualEntry) {
+                    Text(text = "Transaction Date & Time", style = MaterialTheme.typography.titleSmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = dateFormat.format(Date(customTimestamp)))
+                        }
+                        OutlinedButton(
+                            onClick = { showTimePicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = timeFormat.format(Date(customTimestamp)))
+                        }
+                    }
+                }
 
                 Text(text = "Category", style = MaterialTheme.typography.titleSmall)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -184,15 +336,38 @@ fun PaymentEntryScreen(
                 }
 
                 Text(text = "Select app", style = MaterialTheme.typography.titleSmall)
-                if (paymentApps.isEmpty()) {
-                    Text(text = "No configured apps for ${paymentType.typeName}. Check Settings.", color = Color.Gray)
+                if (allUpiApps.isEmpty()) {
+                    Text(text = "No apps available for ${paymentType.typeName}.", color = Color.Gray)
                 } else {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(paymentApps) { app ->
+                        items(allUpiApps) { app ->
+                            val isSelected = if (app.isFromDb) {
+                                selectedDbApp?.packageName == app.packageName
+                            } else {
+                                selectedInstalledAppPackage == app.packageName
+                            }
                             PaymentAppCard(
-                                app = app,
-                                selected = selectedApp?.id == app.id,
-                                onClick = { viewModel.selectPaymentApp(app) }
+                                app = PaymentAppConfig(
+                                    displayName = app.displayName,
+                                    packageName = app.packageName,
+                                    paymentType = paymentType,
+                                    enabled = true
+                                ),
+                                selected = isSelected,
+                                onClick = {
+                                    if (app.isFromDb) {
+                                        val dbApp = dbPaymentApps.find { it.packageName == app.packageName }
+                                        if (dbApp != null) {
+                                            viewModel.selectPaymentApp(dbApp)
+                                        }
+                                        selectedInstalledAppName = ""
+                                        selectedInstalledAppPackage = ""
+                                    } else {
+                                        selectedInstalledAppName = app.displayName
+                                        selectedInstalledAppPackage = app.packageName
+                                        viewModel.selectPaymentApp(null)
+                                    }
+                                }
                             )
                         }
                     }
@@ -219,8 +394,11 @@ fun PaymentEntryScreen(
                         localError = ""
                         viewModel.clearError()
 
-                        val app = selectedApp
-                        val paymentAppName = app?.displayName ?: "Manual"
+                        val paymentAppName = selectedDbApp?.displayName
+                            ?: selectedInstalledAppName.ifBlank { null }
+                            ?: "Manual"
+                        val paymentAppPackage = selectedDbApp?.packageName
+                            ?: selectedInstalledAppPackage.ifBlank { null }
 
                         // Save as PENDING first, then open UPI app
                         viewModel.createPendingTransaction(
@@ -231,15 +409,15 @@ fun PaymentEntryScreen(
                             category = category,
                             paymentType = paymentType,
                             paymentAppName = paymentAppName,
-                            isManual = upiId.isNullOrBlank()
+                            isManual = upiId.isNullOrBlank(),
+                            customTimestamp = if (isManualEntry) customTimestamp else null
                         )
 
-                        if (!upiId.isNullOrBlank() && app != null) {
+                        if (!upiId.isNullOrBlank() && paymentAppPackage != null) {
                             val amountRupees = paise / 100
                             val merchant = merchantName ?: upiId
 
-                            // KEY FIX: Add pn (payee name) parameter that UPI apps require
-                            // Without pn, apps like PhonePe/Paytm flag the transaction as risky
+                            // Build UPI URI with all parameters for security (pn param required)
                             val uri = Uri.parse(
                                 "upi://pay?" +
                                 "pa=${Uri.encode(upiId)}" +
@@ -250,13 +428,12 @@ fun PaymentEntryScreen(
                                 "&mode=00"
                             )
                             val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                                setPackage(app.packageName)
+                                setPackage(paymentAppPackage)
                             }
                             if (intent.resolveActivity(context.packageManager) != null) {
                                 context.startActivity(intent)
-                                // User will return and confirm success/failure
                             } else {
-                                localError = "${app.displayName} is not installed. Transaction saved as pending."
+                                localError = "$paymentAppName is not installed. Transaction saved as pending."
                             }
                         } else {
                             // Manual entry or no app selected - mark as completed directly
