@@ -227,11 +227,17 @@ private fun loadContacts(contentResolver: ContentResolver, contacts: MutableList
         val seen = mutableSetOf<String>()
         while (c.moveToNext()) {
             val name = c.getString(nameIndex) ?: "Unknown"
-            val number = c.getString(numberIndex)?.replace(Regex("[\\s\\-()]+"), "") ?: continue
-            val key = "$name:$number"
-            if (key !in seen) {
-                seen.add(key)
-                contacts.add(ContactInfo(name = name, phoneNumber = number))
+            val rawNumber = c.getString(numberIndex) ?: continue
+            // Strip spaces, hyphens, parentheses but PRESERVE '+' prefix
+            // The '+' is kept for display; mobile number detection happens at payment time
+            val number = rawNumber
+                .replace(Regex("[\\s\\-()]+"), "")
+            if (number.isNotBlank()) {
+                val key = "$name:$number"
+                if (key !in seen) {
+                    seen.add(key)
+                    contacts.add(ContactInfo(name = name, phoneNumber = number))
+                }
             }
         }
     }

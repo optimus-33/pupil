@@ -18,12 +18,33 @@ class TransactionRepositoryImpl(
             entities.map { it.toDomain() }
         }
 
+    override suspend fun getTransactionById(id: Long): Transaction? {
+        return dao.getTransactionById(id)?.toDomain()
+    }
+
     override suspend fun insertTransaction(transaction: Transaction): Long {
         return dao.insert(transaction.toEntity())
     }
 
     override suspend fun deleteTransaction(id: Long) {
         dao.deleteById(id)
+    }
+
+    override suspend fun updateTransaction(transaction: Transaction) {
+        val entity = transaction.toEntity()
+        dao.update(
+            id = entity.id,
+            merchantName = entity.merchantName,
+            upiId = entity.upiId,
+            amountPaise = entity.amountPaise,
+            reason = entity.reason,
+            category = entity.category,
+            paymentType = entity.paymentType,
+            paymentApp = entity.paymentApp,
+            timestamp = entity.timestamp,
+            isManual = entity.isManual,
+            status = entity.status
+        )
     }
 
     override suspend fun updateTransactionStatus(id: Long, status: String) {

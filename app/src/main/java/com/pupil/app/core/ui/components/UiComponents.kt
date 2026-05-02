@@ -1,6 +1,7 @@
 package com.pupil.app.core.ui.components
 
-import androidx.compose.foundation.background
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,9 +24,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pupil.app.core.domain.model.PaymentAppConfig
@@ -38,7 +45,8 @@ fun TransactionCard(
     transaction: Transaction,
     onDelete: ((Long) -> Unit)? = null,
     onMarkCompleted: ((Long) -> Unit)? = null,
-    onMarkFailed: ((Long) -> Unit)? = null
+    onMarkFailed: ((Long) -> Unit)? = null,
+    onEdit: ((Long) -> Unit)? = null
 ) {
     val isPending = transaction.status == TransactionStatus.PENDING
     val isFailed = transaction.status == TransactionStatus.FAILED
@@ -85,17 +93,25 @@ fun TransactionCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = transaction.paymentApp, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 Spacer(modifier = Modifier.weight(1f))
+                // Edit button - always visible
+                if (onEdit != null) {
+                    IconButton(onClick = { onEdit(transaction.id) }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                    }
+                }
+                // Delete button - always visible
+                if (onDelete != null) {
+                    IconButton(onClick = { onDelete(transaction.id) }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Delete", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                    }
+                }
+                // Mark complete/fail for pending — distinct icons for clear UX
                 if (isPending && onMarkCompleted != null && onMarkFailed != null) {
                     IconButton(onClick = { onMarkCompleted(transaction.id) }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Refresh, contentDescription = "Mark completed", tint = Teal, modifier = Modifier.size(18.dp))
                     }
                     IconButton(onClick = { onMarkFailed(transaction.id) }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Mark failed", tint = Color(0xFFE53935), modifier = Modifier.size(18.dp))
-                    }
-                }
-                if (isFailed && onDelete != null) {
-                    IconButton(onClick = { onDelete(transaction.id) }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Delete", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Cancel, contentDescription = "Mark failed", tint = Color(0xFFE53935), modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -153,6 +169,24 @@ fun TypeChip(selected: Boolean, onClick: () -> Unit, label: String) {
 
 @Composable
 fun PaymentAppCard(app: PaymentAppConfig, selected: Boolean, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val appIconBitmap = remember(app.packageName) {
+        try {
+            val drawable = context.packageManager.getApplicationIcon(app.packageName)
+            val bitmap = Bitmap.createBitmap(
+                (drawable.intrinsicWidth).coerceAtLeast(1),
+                (drawable.intrinsicHeight).coerceAtLeast(1),
+                Bitmap.Config.ARGB_8888
+            )
+            val canvas = Canvas(bitmap)
+            drawable.setBounds(0, 0, canvas.width, canvas.height)
+            drawable.draw(canvas)
+            bitmap.asImageBitmap()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     Surface(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = if (selected) 6.dp else 1.dp,
@@ -161,9 +195,23 @@ fun PaymentAppCard(app: PaymentAppConfig, selected: Boolean, onClick: () -> Unit
             .clickable(onClick = onClick)
             .padding(4.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = app.displayName, style = MaterialTheme.typography.bodyLarge, color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface)
-            Text(text = app.packageName, style = MaterialTheme.typography.bodySmall, color = if (selected) Color.White.copy(alpha = 0.8f) else Color.Gray)
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (appIconBitmap != null) {
+                Icon(
+                    painter = BitmapPainter(image = appIconBitmap),
+                    contentDescription = app.displayName,
+                    modifier = Modifier.size(32.dp),
+                    tint = Color.Unspecified  // Don't tint icons — green background already indicates selection
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(text = app.displayName, style = MaterialTheme.typography.bodyLarge, color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface)
+                Text(text = app.packageName, style = MaterialTheme.typography.bodySmall, color = if (selected) Color.White.copy(alpha = 0.8f) else Color.Gray)
+            }
         }
     }
 }

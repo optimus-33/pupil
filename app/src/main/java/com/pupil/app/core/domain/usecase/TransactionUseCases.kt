@@ -15,6 +15,8 @@ data class TransactionUseCases(
     val saveTransaction: SaveTransactionUseCase,
     val deleteTransaction: DeleteTransactionUseCase,
     val updateTransactionStatus: UpdateTransactionStatusUseCase,
+    val updateTransaction: UpdateTransactionUseCase,
+    val getTransactionById: GetTransactionByIdUseCase,
     val getPendingTransactions: GetPendingTransactionsUseCase,
     val getPaymentAppsByType: GetPaymentAppsByTypeUseCase,
     val getAllPaymentApps: GetAllPaymentAppsUseCase,
@@ -46,6 +48,14 @@ class UpdateTransactionStatusUseCase(private val repository: com.pupil.app.core.
     suspend operator fun invoke(id: Long, status: String) = repository.updateTransactionStatus(id, status)
 }
 
+class UpdateTransactionUseCase(private val repository: com.pupil.app.core.domain.repository.TransactionRepository) {
+    suspend operator fun invoke(transaction: Transaction) = repository.updateTransaction(transaction)
+}
+
+class GetTransactionByIdUseCase(private val repository: com.pupil.app.core.domain.repository.TransactionRepository) {
+    suspend operator fun invoke(id: Long): Transaction? = repository.getTransactionById(id)
+}
+
 class GetPendingTransactionsUseCase(private val repository: com.pupil.app.core.domain.repository.TransactionRepository) {
     operator fun invoke(): Flow<List<Transaction>> = repository.getPendingTransactions()
 }
@@ -65,4 +75,3 @@ class SetPaymentAppEnabledUseCase(private val repository: com.pupil.app.core.dom
 class AddPaymentAppConfigUseCase(private val repository: com.pupil.app.core.domain.repository.PaymentAppConfigRepository) {
     suspend operator fun invoke(config: PaymentAppConfig) = repository.addPaymentAppConfig(config)
 }
-

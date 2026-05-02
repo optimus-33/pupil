@@ -21,6 +21,8 @@ import com.pupil.app.core.domain.usecase.SaveTransactionUseCase
 import com.pupil.app.core.domain.usecase.SetPaymentAppEnabledUseCase
 import com.pupil.app.core.domain.usecase.TransactionUseCases
 import com.pupil.app.core.domain.usecase.UpdateTransactionStatusUseCase
+import com.pupil.app.core.domain.usecase.UpdateTransactionUseCase
+import com.pupil.app.core.domain.usecase.GetTransactionByIdUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -63,6 +65,8 @@ object AppModule {
         saveTransaction = SaveTransactionUseCase(transactionRepository),
         deleteTransaction = DeleteTransactionUseCase(transactionRepository),
         updateTransactionStatus = UpdateTransactionStatusUseCase(transactionRepository),
+        updateTransaction = UpdateTransactionUseCase(transactionRepository),
+        getTransactionById = GetTransactionByIdUseCase(transactionRepository),
         getPendingTransactions = GetPendingTransactionsUseCase(transactionRepository),
         getPaymentAppsByType = GetPaymentAppsByTypeUseCase(paymentAppConfigRepository),
         getAllPaymentApps = GetAllPaymentAppsUseCase(paymentAppConfigRepository),

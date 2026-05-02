@@ -1,5 +1,6 @@
 package com.pupil.app.feature.settings
 
+import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pupil.app.core.domain.model.PaymentAppConfig

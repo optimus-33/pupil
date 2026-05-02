@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +74,7 @@ fun QRScanScreen(
         )
     }
     var galleryError by rememberSaveable { mutableStateOf("") }
+    val cameraProviderRef = remember { mutableListOf<ProcessCameraProvider>() }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -109,6 +111,14 @@ fun QRScanScreen(
         }
     }
 
+    // Unbind camera when leaving the screen to prevent battery drain
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProviderRef.forEach { it.unbindAll() }
+            cameraProviderRef.clear()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -139,6 +149,7 @@ fun QRScanScreen(
                         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                         cameraProviderFuture.addListener({
                             val cameraProvider = cameraProviderFuture.get()
+                            cameraProviderRef.add(cameraProvider)
                             val preview = Preview.Builder().build().also {
                                 it.setSurfaceProvider(previewView.surfaceProvider)
                             }

@@ -27,6 +27,29 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
+
+    @Query("""
+        UPDATE transactions SET
+        merchantName = :merchantName, upiId = :upiId, amountPaise = :amountPaise,
+        reason = :reason, category = :category, paymentType = :paymentType,
+        paymentApp = :paymentApp, timestamp = :timestamp, isManual = :isManual,
+        status = :status
+        WHERE id = :id
+    """)
+    suspend fun update(
+        id: Long,
+        merchantName: String,
+        upiId: String?,
+        amountPaise: Long,
+        reason: String,
+        category: String,
+        paymentType: String,
+        paymentApp: String,
+        timestamp: Long,
+        isManual: Boolean,
+        status: String
+    )
+
     @Query("SELECT IFNULL(SUM(amountPaise), 0) FROM transactions WHERE timestamp BETWEEN :from AND :to AND status = 'COMPLETED'")
     fun getTotalInRange(from: Long, to: Long): Flow<Long>
 
