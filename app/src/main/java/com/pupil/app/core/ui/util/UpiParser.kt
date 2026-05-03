@@ -20,4 +20,19 @@ object UpiParser {
             ?.trim()
         return candidate
     }
+
+    /**
+     * Extracts the merchant code (mc) parameter from a UPI QR raw value.
+     * Returns null if not present (e.g., for individual/person-to-person QR codes).
+     */
+    fun extractMerchantCode(rawValue: String?): String? {
+        if (rawValue.isNullOrBlank()) return null
+        val normalized = rawValue.trim()
+        if (!normalized.contains("upi://", ignoreCase = true)) return null
+        return try {
+            Uri.parse(normalized).getQueryParameter("mc")
+        } catch (ex: Exception) {
+            null
+        }
+    }
 }

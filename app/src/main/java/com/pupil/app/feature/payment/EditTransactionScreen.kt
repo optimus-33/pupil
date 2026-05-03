@@ -68,7 +68,7 @@ fun EditTransactionScreen(
     var amountInput by rememberSaveable {
         mutableStateOf(Formatters.formatPaise(existingTransaction.amountPaise))
     }
-    var category by rememberSaveable { mutableStateOf(existingTransaction.category) }
+    var categoryId by rememberSaveable { mutableStateOf(existingTransaction.categoryId) }
     var paymentType by rememberSaveable { mutableStateOf(existingTransaction.paymentType) }
     var paymentApp by rememberSaveable { mutableStateOf(existingTransaction.paymentApp) }
     var customTimestamp by rememberSaveable { mutableStateOf(existingTransaction.timestamp) }
@@ -163,11 +163,12 @@ fun EditTransactionScreen(
                         existingTransaction.copy(
                             reason = reasonInput,
                             amountPaise = paise,
-                            category = category,
+                            categoryId = categoryId,
                             paymentType = paymentType,
                             paymentApp = paymentApp,
                             timestamp = customTimestamp,
-                            status = status
+                            status = status,
+                            updatedAt = System.currentTimeMillis()
                         )
                     )
                 }) {
@@ -272,8 +273,13 @@ fun EditTransactionScreen(
                 // Category
                 Text(text = "Category", style = MaterialTheme.typography.titleSmall)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf("Food", "Transport", "Groceries", "Shopping", "Bills", "Health", "Entertainment", "Other")) { item ->
-                        TypeChip(selected = category == item, onClick = { category = item }, label = item)
+                    val categories = listOf(
+                        1L to "Food", 2L to "Transport", 3L to "Groceries",
+                        4L to "Shopping", 5L to "Bills", 6L to "Health",
+                        7L to "Entertainment", 8L to "Other"
+                    )
+                    items(categories) { (id, name) ->
+                        TypeChip(selected = categoryId == id, onClick = { categoryId = id }, label = name)
                     }
                 }
 

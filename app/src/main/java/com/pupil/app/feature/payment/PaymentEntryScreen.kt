@@ -2,6 +2,8 @@ package com.pupil.app.feature.payment
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +27,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HapticFeedbackType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +70,7 @@ import java.util.Locale
 fun PaymentEntryScreen(
     upiId: String?,
     merchantName: String?,
+    merchantCode: String?,
     viewModel: PaymentViewModel,
     onBack: () -> Unit,
     onPaymentComplete: () -> Unit = onBack
@@ -82,7 +84,7 @@ fun PaymentEntryScreen(
     val hapticFeedback = LocalHapticFeedback.current
     var amountInput by rememberSaveable { mutableStateOf("") }
     var reasonInput by rememberSaveable { mutableStateOf("") }
-    var category by rememberSaveable { mutableStateOf("Other") }
+    var categoryId by rememberSaveable { mutableStateOf(8L) }  // Default "Other" category (id=8 after seed)
     var showResultDialog by rememberSaveable { mutableStateOf(false) }
     var localError by rememberSaveable { mutableStateOf("") }
 
@@ -91,10 +93,10 @@ fun PaymentEntryScreen(
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
     // Manual entry state: editable UPI ID / mobile and payee name
+    val isManualEntry = upiId.isNullOrBlank()
     var manualUpiId by rememberSaveable { mutableStateOf("") }
     var manualPayeeName by rememberSaveable { mutableStateOf("") }
     val effectiveUpiId = if (isManualEntry) manualUpiId.ifBlank { upiId.orEmpty() } else upiId.orEmpty()
-    val isManualEntry = upiId.isNullOrBlank()
 
     // Installed UPI apps from device
     var installedUpiApps by rememberSaveable { mutableStateOf<List<InstalledUpiApp>>(emptyList()) }
@@ -105,6 +107,26 @@ fun PaymentEntryScreen(
     // Discover installed UPI apps
     LaunchedEffect(Unit) {
         installedUpiApps = InstalledUpiAppsResolver.getInstalledUpiApps(context.packageManager)
+    }
+
+    // UPI launcher with callback to detect app response (SUCCESS/FAILURE/cancelled)
+    val upiLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val response = result.data?.getStringExtra("response") ?: ""
+        val status = result.data?.getStringExtra("Status") ?: ""
+        when {
+            response.contains("SUCCESS", ignoreCase = true) || status == "SUCCESS" -> {
+                viewModel.confirmPaymentSuccess()
+                onPaymentComplete()
+            }
+            response.contains("FAILURE", ignoreCase = true) || status == "FAILURE" -> {
+                viewModel.confirmPaymentFailed()
+            }
+            else -> {
+                showResultDialog = true
+            }
+        }
     }
 
     // Combined apps: When UPI type is selected, show installed apps + DB apps as supplement
@@ -341,9 +363,14 @@ fun PaymentEntryScreen(
                 }
 
                 Text(text = "Category", style = MaterialTheme.typography.titleSmall)
+                // Category ID mapping matching the seeded categories: 1=Food, 2=Transport, 3=Groceries, 4=Shopping, 5=Bills, 6=Health, 7=Entertainment, 8=Other
+                val categoryItems = listOf(
+                    1L to "Food", 2L to "Transport", 3L to "Groceries", 4L to "Shopping",
+                    5L to "Bills", 6L to "Health", 7L to "Entertainment", 8L to "Other"
+                )
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf("Food", "Transport", "Groceries", "Shopping", "Bills", "Health", "Entertainment", "Other")) { item ->
-                        TypeChip(selected = category == item, onClick = { category = item }, label = item)
+                    items(categoryItems) { (id, name) ->
+                        TypeChip(selected = categoryId == id, onClick = { categoryId = id }, label = name)
                     }
                 }
 
@@ -430,17 +457,21 @@ fun PaymentEntryScreen(
                         val finalMerchantName = if (isManualEntry) manualPayeeName.ifBlank { null }
                             else merchantName?.takeIf { !it.contains("@") }
 
-                        // Mobile number detection: extract digits, take last 10
-                        // This handles +91, 091, +91-98765-43210, 0091, etc.
+                        // Mobile number detection: extract digits, append @upi
+                        // If 10 digits → digits@upi; if 12 digits starting with 91 → digits@upi
                         val digitsOnly = finalUpiId?.replace(Regex("[^0-9]"), "") ?: ""
-                        val isMobileNumber = digitsOnly.length >= 10 && finalUpiId?.any { !it.isDigit() } == true
-                        val resolvedUpiId = if (isMobileNumber) digitsOnly.takeLast(10) else finalUpiId
+                        val resolvedUpiId = when {
+                            digitsOnly.length == 10 -> "${digitsOnly}@upi"
+                            digitsOnly.length == 12 && digitsOnly.startsWith("91") -> "${digitsOnly}@upi"
+                            else -> finalUpiId
+                        }
+                        val isMobileNumber = resolvedUpiId != finalUpiId
 
                         // Derive payee name
                         val resolvedPayeeName = if (isManualEntry && manualPayeeName.isNotBlank()) {
                             manualPayeeName
                         } else if (isMobileNumber) {
-                            "Contact ($resolvedUpiId)"
+                            "Contact (${digitsOnly.takeLast(10)})"
                         } else if (finalMerchantName != null) {
                             finalMerchantName
                         } else if (resolvedUpiId?.contains("@") == true) {
@@ -455,7 +486,8 @@ fun PaymentEntryScreen(
                             upiId = resolvedUpiId,
                             amountPaise = paise,
                             reason = reasonInput,
-                            category = category,
+                            notes = null,
+                            categoryId = categoryId,
                             paymentType = paymentType,
                             paymentAppName = paymentAppName,
                             isManual = finalUpiId.isNullOrBlank(),
@@ -465,20 +497,24 @@ fun PaymentEntryScreen(
                         if (!resolvedUpiId.isNullOrBlank() && paymentAppPackage != null) {
                             val amountRupees = paise / 100
 
-                            // Build UPI URI
-                            val uri = Uri.parse(
-                                "upi://pay?" +
-                                "pa=${Uri.encode(resolvedUpiId)}" +
-                                "&pn=${Uri.encode(resolvedPayeeName)}" +
-                                "&am=$amountRupees" +
-                                "&cu=INR" +
-                                "&tn=${Uri.encode(reasonInput)}"
-                            )
+                            // Build UPI URI using Uri.Builder with mandatory params per UPI Linking Spec v1.6
+                            val uri = Uri.Builder()
+                                .scheme("upi")
+                                .authority("pay")
+                                .appendQueryParameter("pa", resolvedUpiId)
+                                .appendQueryParameter("pn", resolvedPayeeName)
+                                .appendQueryParameter("am", amountRupees.toString())
+                                .appendQueryParameter("cu", "INR")
+                                .appendQueryParameter("tn", reasonInput)
+                                .appendQueryParameter("tr", "PPL${System.currentTimeMillis()}")
+                                .appendQueryParameter("mc", merchantCode ?: "0000")
+                                .appendQueryParameter("mode", "04")
+                                .build()
                             val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                                 setPackage(paymentAppPackage)
                             }
                             if (intent.resolveActivity(context.packageManager) != null) {
-                                context.startActivity(intent)
+                                upiLauncher.launch(intent)
                             } else {
                                 localError = "$paymentAppName is not installed. Transaction saved as pending."
                             }

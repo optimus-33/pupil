@@ -69,8 +69,10 @@ fun PupilNavGraph() {
         composable(Screen.QRScan) {
             QRScanScreen(
                 onBack = { navController.popBackStack() },
-                onContinue = { upiId ->
-                    navController.navigate("${Screen.PaymentEntry}?upiId=${Uri.encode(upiId)}&merchantName=")
+                onContinue = { upiId, merchantCode ->
+                    navController.navigate(
+                        "${Screen.PaymentEntry}?upiId=${Uri.encode(upiId)}&merchantName=&merchantCode=${merchantCode?.let { Uri.encode(it) } ?: ""}"
+                    )
                 }
             )
         }
@@ -91,10 +93,11 @@ fun PupilNavGraph() {
             )
         }
         composable(
-            route = "${Screen.PaymentEntry}?upiId={upiId}&merchantName={merchantName}",
+            route = "${Screen.PaymentEntry}?upiId={upiId}&merchantName={merchantName}&merchantCode={merchantCode}",
             arguments = listOf(
                 navArgument("upiId") { type = NavType.StringType; defaultValue = "" },
-                navArgument("merchantName") { type = NavType.StringType; defaultValue = "" }
+                navArgument("merchantName") { type = NavType.StringType; defaultValue = "" },
+                navArgument("merchantCode") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
             val upiId = backStackEntry.arguments?.getString("upiId")?.takeIf { it.isNotBlank() }
@@ -102,6 +105,7 @@ fun PupilNavGraph() {
             PaymentEntryScreen(
                 upiId = upiId,
                 merchantName = backStackEntry.arguments?.getString("merchantName")?.takeIf { it.isNotBlank() },
+                merchantCode = backStackEntry.arguments?.getString("merchantCode")?.takeIf { it.isNotBlank() },
                 viewModel = paymentViewModel,
                 onBack = { navController.popBackStack() },
                 onPaymentComplete = {
@@ -154,10 +158,19 @@ fun PupilNavGraph() {
         composable(Screen.Settings) {
             val viewModel: SettingsViewModel = hiltViewModel()
             val uiState by viewModel.uiState.collectAsState()
+            val isExporting by viewModel.isExporting.collectAsState()
+            val isImporting by viewModel.isImporting.collectAsState()
+            val backupResult by viewModel.backupResult.collectAsState()
             SettingsScreen(
                 uiState = uiState,
                 onToggleAppEnabled = viewModel::setAppEnabled,
                 onAddCustomApp = viewModel::addCustomApp,
+                onExportBackup = viewModel::exportBackup,
+                onImportBackup = viewModel::importBackup,
+                isExporting = isExporting,
+                isImporting = isImporting,
+                backupResult = backupResult,
+                onClearBackupResult = viewModel::clearBackupResult,
                 onBack = { navController.popBackStack() }
             )
         }

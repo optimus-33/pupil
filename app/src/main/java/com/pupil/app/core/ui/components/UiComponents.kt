@@ -89,7 +89,7 @@ fun TransactionCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CategoryBadge(label = transaction.category)
+                CategoryBadge(label = transaction.categoryName)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = transaction.paymentApp, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 Spacer(modifier = Modifier.weight(1f))

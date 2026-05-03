@@ -6,6 +6,7 @@ import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.PaymentType
 import com.pupil.app.core.domain.model.Transaction
 import com.pupil.app.core.domain.model.TransactionStatus
+import com.pupil.app.core.domain.model.TransactionType
 import com.pupil.app.core.domain.usecase.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,25 +55,33 @@ class PaymentViewModel @Inject constructor(
         upiId: String?,
         amountPaise: Long,
         reason: String,
-        category: String,
+        notes: String? = null,
+        categoryId: Long,
+        transactionType: TransactionType = TransactionType.EXPENSE,
         paymentType: PaymentType,
         paymentAppName: String,
         isManual: Boolean,
         customTimestamp: Long? = null
     ) {
         viewModelScope.launch {
+            val now = customTimestamp ?: System.currentTimeMillis()
             val id = transactionUseCases.saveTransaction(
                 Transaction(
                     merchantName = merchantName.ifBlank { upiId ?: "Unknown merchant" },
                     upiId = upiId,
                     amountPaise = amountPaise,
                     reason = reason,
-                    category = category,
+                    notes = notes,
+                    categoryId = categoryId,
+                    categoryName = "Other",
+                    transactionType = transactionType,
                     paymentType = paymentType,
                     paymentApp = paymentAppName,
-                    timestamp = customTimestamp ?: System.currentTimeMillis(),
+                    timestamp = now,
                     isManual = isManual,
-                    status = TransactionStatus.PENDING
+                    status = TransactionStatus.PENDING,
+                    createdAt = now,
+                    updatedAt = now
                 )
             )
             _pendingTransactionId.value = id
@@ -102,7 +111,7 @@ class PaymentViewModel @Inject constructor(
     }
 
     /**
-     * Delete the pending transaction entirely (user chose to discard)
+     * Soft-delete the pending transaction (user chose to discard)
      */
     fun discardPendingTransaction() {
         val id = _pendingTransactionId.value ?: return

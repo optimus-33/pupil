@@ -27,4 +27,10 @@ interface PaymentAppConfigDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(configs: List<PaymentAppConfigEntity>)
+
+    @Query("SELECT * FROM payment_app_configs ORDER BY paymentType, displayName")
+    suspend fun getAllOnce(): List<PaymentAppConfigEntity>
+
+    @Query("DELETE FROM payment_app_configs")
+    suspend fun deleteAll()
 }

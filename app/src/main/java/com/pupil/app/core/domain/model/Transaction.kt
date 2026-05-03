@@ -6,12 +6,23 @@ data class Transaction(
     val upiId: String?,
     val amountPaise: Long,
     val reason: String,
-    val category: String,
+    val notes: String? = null,
+    val categoryId: Long,
+    val categoryName: String = "Other",
+    val categoryIcon: String? = null,
+    val categoryColor: Int? = null,
+    val transactionType: TransactionType = TransactionType.EXPENSE,
     val paymentType: PaymentType,
     val paymentApp: String,
+    val merchantCode: String? = null,
+    val referenceNumber: String? = null,
+    val accountId: Long? = null,
     val timestamp: Long,
     val isManual: Boolean = false,
-    val status: TransactionStatus = TransactionStatus.COMPLETED
+    val status: TransactionStatus = TransactionStatus.COMPLETED,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deletedAt: Long? = null
 )
 
 enum class TransactionStatus(val statusName: String) {
@@ -24,4 +35,3 @@ enum class TransactionStatus(val statusName: String) {
             values().firstOrNull { it.statusName == value } ?: COMPLETED
     }
 }
-

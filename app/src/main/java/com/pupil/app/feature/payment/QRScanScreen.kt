@@ -63,11 +63,12 @@ import com.pupil.app.core.ui.util.UpiParser
 @Composable
 fun QRScanScreen(
     onBack: () -> Unit,
-    onContinue: (String) -> Unit
+    onContinue: (String, String?) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var detectedVpa by rememberSaveable { mutableStateOf("") }
+    var detectedMc by rememberSaveable { mutableStateOf("") }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -90,9 +91,10 @@ fun QRScanScreen(
                 val bitmap = BitmapFactory.decodeStream(inputStream)
                 inputStream?.close()
                 if (bitmap != null) {
-                    scanBitmapForQr(bitmap) { result ->
-                        if (result.isNotBlank()) {
-                            detectedVpa = result
+                    scanBitmapForQr(bitmap) { upiId, mc ->
+                        if (upiId.isNotBlank()) {
+                            detectedVpa = upiId
+                            detectedMc = mc ?: ""
                         } else {
                             galleryError = "No UPI QR code found in the selected image."
                         }
@@ -159,9 +161,10 @@ fun QRScanScreen(
 
                             val scanner = BarcodeScanning.getClient()
                             imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
-                                scanImageProxy(imageProxy, scanner) { result ->
-                                    if (result.isNotBlank()) {
-                                        detectedVpa = result
+                                scanImageProxy(imageProxy, scanner) { upiId, mc ->
+                                    if (upiId.isNotBlank()) {
+                                        detectedVpa = upiId
+                                        detectedMc = mc ?: ""
                                     }
                                 }
                             }
@@ -219,7 +222,7 @@ fun QRScanScreen(
                                 }
 
                                 Button(
-                                    onClick = { onContinue(detectedVpa) },
+                                    onClick = { onContinue(detectedVpa, detectedMc.ifBlank { null }) },
                                     enabled = detectedVpa.isNotBlank(),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -234,16 +237,17 @@ fun QRScanScreen(
     }
 }
 
-private fun scanImageProxy(imageProxy: ImageProxy, scanner: com.google.mlkit.vision.barcode.BarcodeScanner, onDetected: (String) -> Unit) {
+private fun scanImageProxy(imageProxy: ImageProxy, scanner: com.google.mlkit.vision.barcode.BarcodeScanner, onDetected: (String, String?) -> Unit) {
     @OptIn(ExperimentalGetImage::class)
     val mediaImage = imageProxy.image
     if (mediaImage != null) {
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         scanner.process(image)
             .addOnSuccessListener { barcodes ->
-                val candidate = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
-                if (!candidate.isNullOrBlank()) {
-                    onDetected(candidate)
+                val upiId = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
+                val mc = barcodes.mapNotNull { UpiParser.extractMerchantCode(it.rawValue) }.firstOrNull { it.isNotBlank() }
+                if (!upiId.isNullOrBlank()) {
+                    onDetected(upiId, mc)
                 }
             }
             .addOnFailureListener { }
@@ -253,15 +257,16 @@ private fun scanImageProxy(imageProxy: ImageProxy, scanner: com.google.mlkit.vis
     }
 }
 
-private fun scanBitmapForQr(bitmap: Bitmap, onDetected: (String) -> Unit) {
+private fun scanBitmapForQr(bitmap: Bitmap, onDetected: (String, String?) -> Unit) {
     val scanner = BarcodeScanning.getClient()
     val image = InputImage.fromBitmap(bitmap, 0)
     scanner.process(image)
         .addOnSuccessListener { barcodes ->
-            val candidate = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
-            onDetected(candidate.orEmpty())
+            val upiId = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
+            val mc = barcodes.mapNotNull { UpiParser.extractMerchantCode(it.rawValue) }.firstOrNull { it.isNotBlank() }
+            onDetected(upiId.orEmpty(), mc)
         }
         .addOnFailureListener {
-            onDetected("")
+            onDetected("", null)
         }
 }

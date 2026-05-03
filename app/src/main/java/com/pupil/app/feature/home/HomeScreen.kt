@@ -164,7 +164,7 @@ fun HomeScreen(
                     }
                 } else {
                     // Quick stats summary card
-                    val pendingCount = uiState.transactions.count { it.status.name == "PENDING" }
+                    val pendingCount = uiState.transactions.count { it.status.statusName == "PENDING" }
                     if (pendingCount > 0 || uiState.todayTotalPaise > 0) {
                         Card(
                             modifier = Modifier
