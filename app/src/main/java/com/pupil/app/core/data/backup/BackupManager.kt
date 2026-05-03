@@ -7,6 +7,7 @@ import com.pupil.app.core.data.local.dao.CategoryDao
 import com.pupil.app.core.data.local.dao.PaymentAppConfigDao
 import com.pupil.app.core.data.local.dao.TagDao
 import com.pupil.app.core.data.local.dao.TransactionDao
+import com.pupil.app.core.ui.util.AppLogger
 import com.pupil.app.core.data.local.entity.AccountEntity
 import com.pupil.app.core.data.local.entity.CategoryEntity
 import com.pupil.app.core.data.local.entity.PaymentAppConfigEntity
@@ -144,6 +145,7 @@ class BackupManager @Inject constructor(
 
             BackupResult(true, "Export successful", transactions.size)
         } catch (e: Exception) {
+            AppLogger.e("Backup", "Export failed", e)
             BackupResult(false, "Export failed: ${e.message ?: "Unknown error"}")
         }
     }
@@ -275,6 +277,7 @@ class BackupManager @Inject constructor(
 
             BackupResult(true, "Import successful: ${transactions.size} transactions restored", transactions.size)
         } catch (e: Exception) {
+            AppLogger.e("Backup", "Import failed", e)
             BackupResult(false, "Import failed: ${e.message ?: "Unknown error"}")
         }
     }

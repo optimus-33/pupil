@@ -4,11 +4,14 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.net.Uri
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 
+@Parcelize
 data class InstalledUpiApp(
     val displayName: String,
     val packageName: String
-)
+) : Parcelable
 
 object InstalledUpiAppsResolver {
 

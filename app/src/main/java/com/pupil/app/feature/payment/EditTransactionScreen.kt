@@ -324,12 +324,14 @@ fun EditTransactionScreen(
                 Button(
                     onClick = {
                         if (reasonInput.isBlank()) {
+                            com.pupil.app.core.ui.util.AppLogger.w("EditTxn", "Validation failed: reason is blank")
                             localError = "Please add a reason for this payment."
                             return@Button
                         }
                         val paise = amountInput.toPaise()
                         if (paise == null || paise <= 0L) {
-                            localError = "Enter a valid amount."
+                            com.pupil.app.core.ui.util.AppLogger.w("EditTxn", "Validation failed: invalid amount '$amountInput'")
+                            localError = "Enter a valid amount (greater than 0)."
                             return@Button
                         }
                         localError = ""

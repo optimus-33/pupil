@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.pupil.app.core.domain.model.Transaction
 import com.pupil.app.core.domain.model.TransactionStatus
 import com.pupil.app.core.domain.usecase.TransactionUseCases
+import com.pupil.app.core.ui.util.AppLogger
 import com.pupil.app.core.ui.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,7 @@ class HomeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, HomeUiState())
 
     init {
+        AppLogger.i("HomeVM", "HomeViewModel initialized")
         // Auto-expire pending transactions older than 10 minutes
         viewModelScope.launch {
             val tenMinutesAgo = System.currentTimeMillis() - 10 * 60 * 1000L
@@ -83,6 +85,11 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             transactionUseCases.updateTransactionStatus(id, TransactionStatus.COMPLETED.statusName)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        AppLogger.i("HomeVM", "HomeViewModel cleared")
     }
 }
 

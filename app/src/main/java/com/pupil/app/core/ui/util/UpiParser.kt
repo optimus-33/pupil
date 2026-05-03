@@ -1,6 +1,7 @@
 package com.pupil.app.core.ui.util
 
 import android.net.Uri
+import com.pupil.app.core.ui.util.AppLogger
 
 object UpiParser {
     fun extractUpiId(rawValue: String?): String? {
@@ -10,6 +11,7 @@ object UpiParser {
             val uri = try {
                 Uri.parse(normalized)
             } catch (ex: Exception) {
+                AppLogger.w("UpiParser", "Failed to parse UPI URI: ${normalized.take(50)}", ex)
                 null
             }
             val pa = uri?.getQueryParameter("pa")
@@ -32,6 +34,7 @@ object UpiParser {
         return try {
             Uri.parse(normalized).getQueryParameter("mc")
         } catch (ex: Exception) {
+            AppLogger.w("UpiParser", "Failed to extract merchant code from: ${normalized.take(50)}", ex)
             null
         }
     }

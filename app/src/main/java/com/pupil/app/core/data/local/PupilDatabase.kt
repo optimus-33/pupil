@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.pupil.app.core.data.local.dao.AccountDao
+import com.pupil.app.core.ui.util.AppLogger
 import com.pupil.app.core.data.local.dao.CategoryDao
 import com.pupil.app.core.data.local.dao.PaymentAppConfigDao
 import com.pupil.app.core.data.local.dao.TagDao
@@ -163,30 +164,39 @@ abstract class PupilDatabase : RoomDatabase() {
             }
         }
 
+        private val defaultPaymentApps = listOf(
+            PaymentAppConfigEntity(displayName = "Google Pay", packageName = "com.google.android.apps.nbu.paisa.user", paymentType = "UPI"),
+            PaymentAppConfigEntity(displayName = "PhonePe", packageName = "com.phonepe.app", paymentType = "UPI"),
+            PaymentAppConfigEntity(displayName = "Paytm", packageName = "net.one97.paytm", paymentType = "UPI"),
+            PaymentAppConfigEntity(displayName = "HDFC Bank", packageName = "com.snapwork.hdfc", paymentType = "UPI_CREDIT_CARD"),
+            PaymentAppConfigEntity(displayName = "Axis Mobile", packageName = "com.axis.mobile", paymentType = "UPI_CREDIT_CARD"),
+            PaymentAppConfigEntity(displayName = "ICICI iMobile", packageName = "com.csam.icici.bank.imobile", paymentType = "UPI_CREDIT_CARD")
+        )
+
         fun buildDatabase(context: Context): PupilDatabase {
-            lateinit var database: PupilDatabase
-            val callback = object : Callback() {
-                override fun onCreate(db: SupportSQLiteDatabase) {
-                    super.onCreate(db)
-                    CoroutineScope(Dispatchers.IO).launch {
-                        database.paymentAppConfigDao().insertAll(
-                            listOf(
-                                PaymentAppConfigEntity(displayName = "Google Pay", packageName = "com.google.android.apps.nbu.paisa.user", paymentType = "UPI"),
-                                PaymentAppConfigEntity(displayName = "PhonePe", packageName = "com.phonepe.app", paymentType = "UPI"),
-                                PaymentAppConfigEntity(displayName = "Paytm", packageName = "net.one97.paytm", paymentType = "UPI"),
-                                PaymentAppConfigEntity(displayName = "HDFC Bank", packageName = "com.snapwork.hdfc", paymentType = "UPI_CREDIT_CARD"),
-                                PaymentAppConfigEntity(displayName = "Axis Mobile", packageName = "com.axis.mobile", paymentType = "UPI_CREDIT_CARD"),
-                                PaymentAppConfigEntity(displayName = "ICICI iMobile", packageName = "com.csam.icici.bank.imobile", paymentType = "UPI_CREDIT_CARD")
-                            )
-                        )
+            val database = Room.databaseBuilder(context, PupilDatabase::class.java, "pupil_db")
+                .addCallback(object : Callback() {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        super.onCreate(db)
+                        AppLogger.d("DB", "Database created — seeding will run after build")
                     }
-                }
-            }
-            database = Room.databaseBuilder(context, PupilDatabase::class.java, "pupil_db")
-                .addCallback(callback)
+                })
                 .addMigrations(MIGRATION_2_3)
                 .build()
+            // Seed payment apps after database is fully built (no lateinit race)
+            seedDefaultPaymentApps(database)
             return database
+        }
+
+        private fun seedDefaultPaymentApps(database: PupilDatabase) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    database.paymentAppConfigDao().insertAll(defaultPaymentApps)
+                    AppLogger.i("DB", "Seeded ${defaultPaymentApps.size} default payment apps")
+                } catch (e: Exception) {
+                    AppLogger.e("DB", "Failed to seed default payment apps", e)
+                }
+            }
         }
     }
 }

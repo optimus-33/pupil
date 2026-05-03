@@ -8,6 +8,7 @@ import com.pupil.app.core.domain.model.Transaction
 import com.pupil.app.core.domain.model.TransactionStatus
 import com.pupil.app.core.domain.model.TransactionType
 import com.pupil.app.core.domain.usecase.TransactionUseCases
+import com.pupil.app.core.ui.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +22,10 @@ import javax.inject.Inject
 class PaymentViewModel @Inject constructor(
     private val transactionUseCases: TransactionUseCases
 ) : ViewModel() {
+    init {
+        AppLogger.i("PaymentVM", "PaymentViewModel initialized")
+    }
+
     private val paymentTypeFlow = MutableStateFlow(PaymentType.UPI)
     private val selectedAppFlow = MutableStateFlow<PaymentAppConfig?>(null)
 
@@ -123,5 +128,10 @@ class PaymentViewModel @Inject constructor(
 
     fun clearError() {
         _errorMessage.value = ""
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        AppLogger.i("PaymentVM", "PaymentViewModel cleared")
     }
 }

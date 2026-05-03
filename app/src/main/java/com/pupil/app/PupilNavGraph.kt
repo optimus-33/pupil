@@ -6,11 +6,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.pupil.app.core.ui.util.AppLogger
 import com.pupil.app.feature.home.HomeScreen
 import com.pupil.app.feature.home.HomeViewModel
 import com.pupil.app.feature.payment.ContactsPickerScreen
@@ -24,6 +26,14 @@ import com.pupil.app.feature.reports.ReportsScreen
 import com.pupil.app.feature.reports.ReportsViewModel
 import com.pupil.app.feature.settings.SettingsScreen
 import com.pupil.app.feature.settings.SettingsViewModel
+
+private fun NavController.safeNavigate(route: String) {
+    try {
+        navigate(route)
+    } catch (e: Exception) {
+        AppLogger.e("NavGraph", "Navigation failed: route='$route'", e)
+    }
+}
 
 object Screen {
     const val Home = "home"
@@ -50,19 +60,19 @@ fun PupilNavGraph() {
             HomeScreen(
                 uiState = uiState,
                 pendingDeleteId = pendingDeleteId,
-                onScanPay = { navController.navigate(Screen.QRScan) },
-                onManualEntry = { navController.navigate("${Screen.PaymentEntry}?upiId=&merchantName=") },
-                onOpenReports = { navController.navigate(Screen.Reports) },
-                onOpenSettings = { navController.navigate(Screen.Settings) },
+                onScanPay = { navController.safeNavigate(Screen.QRScan) },
+                onManualEntry = { navController.safeNavigate("${Screen.PaymentEntry}?upiId=&merchantName=") },
+                onOpenReports = { navController.safeNavigate(Screen.Reports) },
+                onOpenSettings = { navController.safeNavigate(Screen.Settings) },
                 onDeleteTransaction = viewModel::requestDeleteTransaction,
                 onMarkCompleted = viewModel::markTransactionAsCompleted,
                 onMarkFailed = viewModel::markTransactionAsFailed,
                 onConfirmDelete = viewModel::confirmDeleteTransaction,
                 onCancelDelete = viewModel::cancelDeleteTransaction,
-                onEnterUpiId = { navController.navigate(Screen.UpiEntry) },
-                onPickContact = { navController.navigate(Screen.ContactsPicker) },
+                onEnterUpiId = { navController.safeNavigate(Screen.UpiEntry) },
+                onPickContact = { navController.safeNavigate(Screen.ContactsPicker) },
                 onEditTransaction = { transactionId ->
-                    navController.navigate(Screen.editTransaction(transactionId))
+                    navController.safeNavigate(Screen.editTransaction(transactionId))
                 }
             )
         }
@@ -70,7 +80,7 @@ fun PupilNavGraph() {
             QRScanScreen(
                 onBack = { navController.popBackStack() },
                 onContinue = { upiId, merchantCode ->
-                    navController.navigate(
+                    navController.safeNavigate(
                         "${Screen.PaymentEntry}?upiId=${Uri.encode(upiId)}&merchantName=&merchantCode=${merchantCode?.let { Uri.encode(it) } ?: ""}"
                     )
                 }
@@ -80,7 +90,7 @@ fun PupilNavGraph() {
             UpiEntryScreen(
                 onBack = { navController.popBackStack() },
                 onContinue = { upiId ->
-                    navController.navigate("${Screen.PaymentEntry}?upiId=${Uri.encode(upiId)}&merchantName=")
+                    navController.safeNavigate("${Screen.PaymentEntry}?upiId=${Uri.encode(upiId)}&merchantName=")
                 }
             )
         }
@@ -88,7 +98,7 @@ fun PupilNavGraph() {
             ContactsPickerScreen(
                 onBack = { navController.popBackStack() },
                 onContactSelected = { phoneNumber ->
-                    navController.navigate("${Screen.PaymentEntry}?upiId=${Uri.encode(phoneNumber)}&merchantName=${Uri.encode(phoneNumber)}")
+                    navController.safeNavigate("${Screen.PaymentEntry}?upiId=${Uri.encode(phoneNumber)}&merchantName=${Uri.encode(phoneNumber)}")
                 }
             )
         }

@@ -9,6 +9,7 @@ import com.pupil.app.core.data.backup.BackupResult
 import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.PaymentType
 import com.pupil.app.core.domain.usecase.TransactionUseCases
+import com.pupil.app.core.ui.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +26,10 @@ class SettingsViewModel @Inject constructor(
     private val backupManager: BackupManager,
     private val application: Application
 ) : ViewModel() {
+    init {
+        AppLogger.i("SettingsVM", "SettingsViewModel initialized")
+    }
+
     val uiState: StateFlow<SettingsUiState> = transactionUseCases.getAllPaymentApps()
         .map { apps -> SettingsUiState(apps = apps) }
         .stateIn(viewModelScope, SharingStarted.Lazily, SettingsUiState())
@@ -64,6 +69,7 @@ class SettingsViewModel @Inject constructor(
                 val result = backupManager.exportBackup(application, uri)
                 _backupResult.value = result
             } catch (e: Exception) {
+                AppLogger.e("SettingsVM", "Backup export failed", e)
                 _backupResult.value = BackupResult(false, "Export error: ${e.message}")
             } finally {
                 _isExporting.value = false
@@ -78,6 +84,7 @@ class SettingsViewModel @Inject constructor(
                 val result = backupManager.importBackup(application, uri)
                 _backupResult.value = result
             } catch (e: Exception) {
+                AppLogger.e("SettingsVM", "Backup import failed", e)
                 _backupResult.value = BackupResult(false, "Import error: ${e.message}")
             } finally {
                 _isImporting.value = false
@@ -87,6 +94,11 @@ class SettingsViewModel @Inject constructor(
 
     fun clearBackupResult() {
         _backupResult.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        AppLogger.i("SettingsVM", "SettingsViewModel cleared")
     }
 }
 

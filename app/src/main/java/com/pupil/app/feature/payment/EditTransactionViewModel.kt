@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pupil.app.core.domain.model.Transaction
 import com.pupil.app.core.domain.usecase.TransactionUseCases
+import com.pupil.app.core.ui.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,10 @@ import javax.inject.Inject
 class EditTransactionViewModel @Inject constructor(
     private val transactionUseCases: TransactionUseCases
 ) : ViewModel() {
+
+    init {
+        AppLogger.i("EditTxnVM", "EditTransactionViewModel initialized")
+    }
 
     private val _transaction = MutableStateFlow<Transaction?>(null)
     val transaction: StateFlow<Transaction?> = _transaction
@@ -33,6 +38,7 @@ class EditTransactionViewModel @Inject constructor(
                     _error.value = "Transaction not found"
                 }
             } catch (e: Exception) {
+                AppLogger.e("EditTxnVM", "Failed to load transaction", e)
                 _error.value = "Failed to load transaction: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -40,11 +46,17 @@ class EditTransactionViewModel @Inject constructor(
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        AppLogger.i("EditTxnVM", "EditTransactionViewModel cleared")
+    }
+
     fun updateTransaction(transaction: Transaction) {
         viewModelScope.launch {
             try {
                 transactionUseCases.updateTransaction(transaction)
             } catch (e: Exception) {
+                AppLogger.e("EditTxnVM", "Failed to update transaction", e)
                 _error.value = "Failed to update transaction: ${e.message}"
             }
         }

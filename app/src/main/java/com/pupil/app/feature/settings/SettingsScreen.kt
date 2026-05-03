@@ -379,6 +379,7 @@ private fun InstalledAppSearchDialog(
                 InstalledAppInfo(appName, packageName)
             }.sortedBy { it.displayName.lowercase() }
         } catch (e: Exception) {
+            com.pupil.app.core.ui.util.AppLogger.e("SettingsScreen", "Failed to query installed apps", e)
             emptyList()
         }
     }

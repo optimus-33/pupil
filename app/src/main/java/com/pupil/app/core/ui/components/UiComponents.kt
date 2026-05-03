@@ -183,6 +183,7 @@ fun PaymentAppCard(app: PaymentAppConfig, selected: Boolean, onClick: () -> Unit
             drawable.draw(canvas)
             bitmap.asImageBitmap()
         } catch (e: Exception) {
+            com.pupil.app.core.ui.util.AppLogger.w("UI", "Failed to load app icon for ${app.packageName}", e)
             null
         }
     }

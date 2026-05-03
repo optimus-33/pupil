@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.PaymentType
+import com.pupil.app.core.ui.util.AppLogger
 import com.pupil.app.core.ui.components.PaymentAppCard
 import com.pupil.app.core.ui.components.TypeChip
 import com.pupil.app.core.ui.util.InstalledUpiApp
@@ -115,15 +116,20 @@ fun PaymentEntryScreen(
     ) { result ->
         val response = result.data?.getStringExtra("response") ?: ""
         val status = result.data?.getStringExtra("Status") ?: ""
+        val resultCode = result.resultCode
+        AppLogger.i("UPI", "Launcher result: resultCode=$resultCode status='$status' response='${response.take(100)}'")
         when {
             response.contains("SUCCESS", ignoreCase = true) || status == "SUCCESS" -> {
+                AppLogger.i("UPI", "Payment confirmed SUCCESS")
                 viewModel.confirmPaymentSuccess()
                 onPaymentComplete()
             }
             response.contains("FAILURE", ignoreCase = true) || status == "FAILURE" -> {
+                AppLogger.w("UPI", "Payment reported FAILURE")
                 viewModel.confirmPaymentFailed()
             }
             else -> {
+                AppLogger.w("UPI", "Payment result ambiguous - showing result dialog")
                 showResultDialog = true
             }
         }
@@ -436,11 +442,18 @@ fun PaymentEntryScreen(
 
                         val paise = amountInput.toPaise()
                         if (reasonInput.isBlank()) {
+                            AppLogger.w("PaymentEntry", "Validation failed: reason is blank")
                             localError = "Please add a reason for this payment."
                             return@Button
                         }
                         if (paise == null || paise <= 0L) {
-                            localError = "Enter a valid amount."
+                            AppLogger.w("PaymentEntry", "Validation failed: invalid amount '$amountInput'")
+                            localError = "Enter a valid amount (greater than 0)."
+                            return@Button
+                        }
+                        if (isManualEntry && manualUpiId.isNotBlank() && !manualUpiId.contains("@")) {
+                            AppLogger.w("PaymentEntry", "Validation failed: manual UPI ID missing @")
+                            localError = "Enter a valid UPI ID (must contain @)."
                             return@Button
                         }
                         localError = ""
@@ -510,12 +523,15 @@ fun PaymentEntryScreen(
                                 .appendQueryParameter("mc", merchantCode ?: "0000")
                                 .appendQueryParameter("mode", "04")
                                 .build()
+                            AppLogger.i("UPI", "Launching UPI intent: app=$paymentAppPackage amount=$amountRupees payeeName=$resolvedPayeeName")
                             val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                                 setPackage(paymentAppPackage)
                             }
                             if (intent.resolveActivity(context.packageManager) != null) {
+                                AppLogger.i("UPI", "UPI intent resolved, launching")
                                 upiLauncher.launch(intent)
                             } else {
+                                AppLogger.w("UPI", "UPI intent NOT resolved for $paymentAppPackage - app not installed")
                                 localError = "$paymentAppName is not installed. Transaction saved as pending."
                             }
                         } else {
@@ -526,7 +542,7 @@ fun PaymentEntryScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "Pay & Record")
+                    Text(text = if (isManualEntry) "Record" else "Pay & Record")
                 }
             }
         }

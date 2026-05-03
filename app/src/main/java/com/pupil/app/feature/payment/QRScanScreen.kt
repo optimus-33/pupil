@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -57,6 +56,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import com.pupil.app.core.ui.util.AppLogger
 import com.pupil.app.core.ui.util.UpiParser
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,7 +101,7 @@ fun QRScanScreen(
                     }
                 }
             } catch (e: Exception) {
-                Log.e("QRScanScreen", "Failed to read image", e)
+                AppLogger.e("QRScan", "Failed to read image from gallery", e)
                 galleryError = "Failed to read the selected image."
             }
         }
@@ -173,7 +173,7 @@ fun QRScanScreen(
                                 cameraProvider.unbindAll()
                                 cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
                             } catch (error: Exception) {
-                                Log.e("QRScanScreen", "Camera bind failed", error)
+                                AppLogger.e("QRScan", "Camera bind failed", error)
                             }
                         }, ContextCompat.getMainExecutor(context))
                     }
