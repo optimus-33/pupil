@@ -2,35 +2,44 @@ package com.pupil.app.feature.payment
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.util.Log
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,30 +56,68 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import com.pupil.app.core.ui.util.AppLogger
 import com.pupil.app.core.ui.util.UpiParser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QRScanScreen(
     onBack: () -> Unit,
-    onContinue: (String) -> Unit
+    onContinue: (String, String?) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var detectedVpa by rememberSaveable { mutableStateOf("") }
-    var hasPermission by remember {
+    var detectedMc by rememberSaveable { mutableStateOf("") }
+    var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         )
     }
+    var galleryError by rememberSaveable { mutableStateOf("") }
+    val cameraProviderRef = remember { mutableListOf<ProcessCameraProvider>() }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted -> hasPermission = isGranted }
+    ) { isGranted -> hasCameraPermission = isGranted }
+
+    // Gallery picker for QR images
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+                if (bitmap != null) {
+                    scanBitmapForQr(bitmap) { upiId, mc ->
+                        if (upiId.isNotBlank()) {
+                            detectedVpa = upiId
+                            detectedMc = mc ?: ""
+                        } else {
+                            galleryError = "No UPI QR code found in the selected image."
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.e("QRScan", "Failed to read image from gallery", e)
+                galleryError = "Failed to read the selected image."
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
-        if (!hasPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
+        if (!hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    // Unbind camera when leaving the screen to prevent battery drain
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProviderRef.forEach { it.unbindAll() }
+            cameraProviderRef.clear()
         }
     }
 
@@ -87,7 +134,7 @@ fun QRScanScreen(
         }
     ) { innerPadding ->
         Surface(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (!hasPermission) {
+            if (!hasCameraPermission) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(text = "Camera permission required to scan QR codes.", color = Color.Gray)
                 }
@@ -104,6 +151,7 @@ fun QRScanScreen(
                         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                         cameraProviderFuture.addListener({
                             val cameraProvider = cameraProviderFuture.get()
+                            cameraProviderRef.add(cameraProvider)
                             val preview = Preview.Builder().build().also {
                                 it.setSurfaceProvider(previewView.surfaceProvider)
                             }
@@ -113,9 +161,10 @@ fun QRScanScreen(
 
                             val scanner = BarcodeScanning.getClient()
                             imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
-                                scanImageProxy(imageProxy, scanner) { result ->
-                                    if (result.isNotBlank()) {
-                                        detectedVpa = result
+                                scanImageProxy(imageProxy, scanner) { upiId, mc ->
+                                    if (upiId.isNotBlank()) {
+                                        detectedVpa = upiId
+                                        detectedMc = mc ?: ""
                                     }
                                 }
                             }
@@ -124,7 +173,7 @@ fun QRScanScreen(
                                 cameraProvider.unbindAll()
                                 cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
                             } catch (error: Exception) {
-                                Log.e("QRScanScreen", "Camera bind failed", error)
+                                AppLogger.e("QRScan", "Camera bind failed", error)
                             }
                         }, ContextCompat.getMainExecutor(context))
                     }
@@ -138,17 +187,47 @@ fun QRScanScreen(
                     ) {
                         Column {
                             Text(
-                                text = if (detectedVpa.isBlank()) "Point your camera at a UPI QR code." else "Detected: $detectedVpa",
+                                text = when {
+                                    detectedVpa.isNotBlank() -> "Detected: $detectedVpa"
+                                    galleryError.isNotBlank() -> galleryError
+                                    else -> "Point your camera at a UPI QR code."
+                                },
                                 color = Color.White,
                                 style = MaterialTheme.typography.bodyLarge
                             )
+
+                            if (galleryError.isNotBlank()) {
+                                galleryError = ""
+                            }
+
                             Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = { onContinue(detectedVpa) },
-                                enabled = detectedVpa.isNotBlank(),
-                                modifier = Modifier.fillMaxWidth()
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text(text = "Continue")
+                                OutlinedButton(
+                                    onClick = {
+                                        galleryLauncher.launch("image/*")
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoLibrary,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.size(4.dp))
+                                    Text(text = "Browse Gallery")
+                                }
+
+                                Button(
+                                    onClick = { onContinue(detectedVpa, detectedMc.ifBlank { null }) },
+                                    enabled = detectedVpa.isNotBlank(),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(text = "Continue")
+                                }
                             }
                         }
                     }
@@ -158,15 +237,17 @@ fun QRScanScreen(
     }
 }
 
-private fun scanImageProxy(imageProxy: ImageProxy, scanner: com.google.mlkit.vision.barcode.BarcodeScanner, onDetected: (String) -> Unit) {
+private fun scanImageProxy(imageProxy: ImageProxy, scanner: com.google.mlkit.vision.barcode.BarcodeScanner, onDetected: (String, String?) -> Unit) {
+    @OptIn(ExperimentalGetImage::class)
     val mediaImage = imageProxy.image
     if (mediaImage != null) {
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         scanner.process(image)
             .addOnSuccessListener { barcodes ->
-                val candidate = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
-                if (!candidate.isNullOrBlank()) {
-                    onDetected(candidate)
+                val upiId = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
+                val mc = barcodes.mapNotNull { UpiParser.extractMerchantCode(it.rawValue) }.firstOrNull { it.isNotBlank() }
+                if (!upiId.isNullOrBlank()) {
+                    onDetected(upiId, mc)
                 }
             }
             .addOnFailureListener { }
@@ -174,4 +255,18 @@ private fun scanImageProxy(imageProxy: ImageProxy, scanner: com.google.mlkit.vis
     } else {
         imageProxy.close()
     }
+}
+
+private fun scanBitmapForQr(bitmap: Bitmap, onDetected: (String, String?) -> Unit) {
+    val scanner = BarcodeScanning.getClient()
+    val image = InputImage.fromBitmap(bitmap, 0)
+    scanner.process(image)
+        .addOnSuccessListener { barcodes ->
+            val upiId = barcodes.mapNotNull { UpiParser.extractUpiId(it.rawValue) }.firstOrNull { it.isNotBlank() }
+            val mc = barcodes.mapNotNull { UpiParser.extractMerchantCode(it.rawValue) }.firstOrNull { it.isNotBlank() }
+            onDetected(upiId.orEmpty(), mc)
+        }
+        .addOnFailureListener {
+            onDetected("", null)
+        }
 }

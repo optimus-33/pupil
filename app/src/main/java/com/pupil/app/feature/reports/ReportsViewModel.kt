@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.pupil.app.core.domain.model.CategoryTotal
 import com.pupil.app.core.domain.usecase.TransactionUseCases
 import com.pupil.app.core.ui.util.DateUtils
+import com.pupil.app.core.ui.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,10 @@ import javax.inject.Inject
 class ReportsViewModel @Inject constructor(
     transactionUseCases: TransactionUseCases
 ) : ViewModel() {
+    init {
+        AppLogger.i("ReportsVM", "ReportsViewModel initialized")
+    }
+
     private val weekTotal = transactionUseCases.getWeeklyTotal(
         DateUtils.startOfWeek(System.currentTimeMillis()),
         System.currentTimeMillis()
@@ -36,6 +41,11 @@ class ReportsViewModel @Inject constructor(
             categoryBreakdown = breakdown
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, ReportsUiState())
+
+    override fun onCleared() {
+        super.onCleared()
+        AppLogger.i("ReportsVM", "ReportsViewModel cleared")
+    }
 }
 
 data class ReportsUiState(

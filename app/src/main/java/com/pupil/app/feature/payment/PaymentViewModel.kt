@@ -5,13 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.pupil.app.core.domain.model.PaymentAppConfig
 import com.pupil.app.core.domain.model.PaymentType
 import com.pupil.app.core.domain.model.Transaction
+import com.pupil.app.core.domain.model.TransactionStatus
+import com.pupil.app.core.domain.model.TransactionType
 import com.pupil.app.core.domain.usecase.TransactionUseCases
-import com.pupil.app.core.ui.util.DateUtils
+import com.pupil.app.core.ui.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -21,6 +22,10 @@ import javax.inject.Inject
 class PaymentViewModel @Inject constructor(
     private val transactionUseCases: TransactionUseCases
 ) : ViewModel() {
+    init {
+        AppLogger.i("PaymentVM", "PaymentViewModel initialized")
+    }
+
     private val paymentTypeFlow = MutableStateFlow(PaymentType.UPI)
     private val selectedAppFlow = MutableStateFlow<PaymentAppConfig?>(null)
 
@@ -31,39 +36,102 @@ class PaymentViewModel @Inject constructor(
     val selectedPaymentType: StateFlow<PaymentType> = paymentTypeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, PaymentType.UPI)
     val selectedApp: StateFlow<PaymentAppConfig?> = selectedAppFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    private val _pendingTransactionId = MutableStateFlow<Long?>(null)
+    val pendingTransactionId: StateFlow<Long?> = _pendingTransactionId.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val _errorMessage = MutableStateFlow("")
+    val errorMessage: StateFlow<String> = _errorMessage.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     fun selectPaymentType(paymentType: PaymentType) {
         paymentTypeFlow.value = paymentType
         selectedAppFlow.value = null
     }
 
-    fun selectPaymentApp(app: PaymentAppConfig) {
+    fun selectPaymentApp(app: PaymentAppConfig?) {
         selectedAppFlow.value = app
     }
 
-    fun saveTransaction(
+    /**
+     * Creates a pending transaction and returns its ID.
+     * Supports custom timestamp for manual entries.
+     */
+    fun createPendingTransaction(
         merchantName: String,
         upiId: String?,
         amountPaise: Long,
         reason: String,
-        category: String,
+        notes: String? = null,
+        categoryId: Long,
+        transactionType: TransactionType = TransactionType.EXPENSE,
         paymentType: PaymentType,
         paymentAppName: String,
-        isManual: Boolean
+        isManual: Boolean,
+        customTimestamp: Long? = null
     ) {
         viewModelScope.launch {
-            transactionUseCases.saveTransaction(
+            val now = customTimestamp ?: System.currentTimeMillis()
+            val id = transactionUseCases.saveTransaction(
                 Transaction(
-                    merchantName = merchantName.ifBlank { "Unknown merchant" },
+                    merchantName = merchantName.ifBlank { upiId ?: "Unknown merchant" },
                     upiId = upiId,
                     amountPaise = amountPaise,
                     reason = reason,
-                    category = category,
+                    notes = notes,
+                    categoryId = categoryId,
+                    categoryName = "Other",
+                    transactionType = transactionType,
                     paymentType = paymentType,
                     paymentApp = paymentAppName,
-                    timestamp = System.currentTimeMillis(),
-                    isManual = isManual
+                    timestamp = now,
+                    isManual = isManual,
+                    status = TransactionStatus.PENDING,
+                    createdAt = now,
+                    updatedAt = now
                 )
             )
+            _pendingTransactionId.value = id
         }
+    }
+
+    /**
+     * Mark the pending transaction as completed (payment succeeded)
+     */
+    fun confirmPaymentSuccess() {
+        val id = _pendingTransactionId.value ?: return
+        viewModelScope.launch {
+            transactionUseCases.updateTransactionStatus(id, TransactionStatus.COMPLETED.statusName)
+            _pendingTransactionId.value = null
+        }
+    }
+
+    /**
+     * Mark the pending transaction as failed (payment failed)
+     */
+    fun confirmPaymentFailed() {
+        val id = _pendingTransactionId.value ?: return
+        viewModelScope.launch {
+            transactionUseCases.updateTransactionStatus(id, TransactionStatus.FAILED.statusName)
+            _pendingTransactionId.value = null
+        }
+    }
+
+    /**
+     * Soft-delete the pending transaction (user chose to discard)
+     */
+    fun discardPendingTransaction() {
+        val id = _pendingTransactionId.value ?: return
+        viewModelScope.launch {
+            transactionUseCases.deleteTransaction(id)
+            _pendingTransactionId.value = null
+        }
+    }
+
+    fun clearError() {
+        _errorMessage.value = ""
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        AppLogger.i("PaymentVM", "PaymentViewModel cleared")
     }
 }

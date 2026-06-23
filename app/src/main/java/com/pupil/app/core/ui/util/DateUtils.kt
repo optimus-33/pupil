@@ -15,6 +15,14 @@ object DateUtils {
         return SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(timestamp))
     }
 
+    fun formatTimestamp(timestamp: Long): String {
+        return SimpleDateFormat("d MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(timestamp))
+    }
+
+    fun formatTimeOnly(timestamp: Long): String {
+        return SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(timestamp))
+    }
+
     fun startOfDay(timestamp: Long): Long {
         val calendar = Calendar.getInstance().apply {
             timeInMillis = timestamp
